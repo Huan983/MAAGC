@@ -43,5 +43,12 @@
         "custom_action": "YearlyTaskProcessor",
         "post_delay": 500,
         "timeout": 3000
+    },
+    "Auto_MarryTask": {
+        "recognition": "DirectHit",
+        "action": "Custom",
+        "custom_action": "MarryProcessor",
+        "post_delay": 500,
+        "timeout": 3000
     }
 }
