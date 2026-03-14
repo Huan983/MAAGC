@@ -330,5 +330,137 @@
         "action": "Click",
         "post_delay": 500,
         "timeout": 2000
+    },
+    // 事件：表白成功
+    "Event_ConfessionSuccess": {
+        "recognition": "OCR",
+        "roi": [
+            112,
+            163,
+            441,
+            180
+        ],
+        "expected": [
+            "表白成功"
+        ],
+        "action": "Click",
+        "post_delay": 500,
+        "timeout": 2000,
+        "next": []
+    },
+    // 检查当前是否婚礼页面
+    "Event_WeddingPage": {
+        "recognition": "OCR",
+        "expected": [
+            "婚礼"
+        ],
+        "roi": [
+            245,
+            0,
+            240,
+            124
+        ],
+        "timeout": 2000
+    },
+    "Event_WeddingTitleCheckLeft": {
+        "recognition": "OCR",
+        "expected": [
+            "公",
+            "伯",
+            "男",
+            "骑"
+        ],
+        "roi": [
+            7,
+            420,
+            282,
+            142
+        ],
+        "timeout": 2000
+    },
+    "Event_WeddingTitleCheckRight": {
+        "recognition": "OCR",
+        "expected": [
+            "公",
+            "伯",
+            "男",
+            "骑"
+        ],
+        "roi": [
+            455,
+            358,
+            265,
+            210
+        ],
+        "timeout": 2000
+    },
+    //查找目标宴会按钮
+    "Event_WeddingTitleButton": {
+        "recognition": "DirectHit",
+        "next": [
+            "Event_WeddingTitleEntry",
+            "[JumpBack]Event_WeddingSweepDown"
+        ]
+    },
+    "Event_WeddingTitleEntry": {
+        "recognition": "OCR",
+        "expected": [
+            "祝福"
+        ],
+        "roi": [
+            24,
+            573,
+            278,
+            633
+        ],
+        "action": "Click",
+        "post_delay": 500,
+        "timeout": 2000
+    },
+    "Event_WeddingSweepDown": {
+        "recognition": "DirectHit",
+        "action": "Swipe",
+        "begin": [
+            374,
+            1000,
+            1,
+            1
+        ],
+        "end": [
+            383,
+            850,
+            1,
+            1
+        ],
+        "post_delay": 500,
+        "timeout": 2000
+    },
+    "Event_WeddingSweepUp": {
+        "recognition": "DirectHit",
+        "action": "Swipe",
+        "begin": [
+            383,
+            850,
+            1,
+            1
+        ],
+        "end": [
+            374,
+            1000,
+            1,
+            1
+        ],
+        "post_delay": 500,
+        "timeout": 2000
+    },
+    // 事件：表白失败
+    "Event_ConfessionFail": {
+        "recognition": "OCR",
+        "expected": [
+            "表白失败"
+        ],
+        "action": "Click",
+        "post_delay": 500,
+        "timeout": 2000
     }
 }

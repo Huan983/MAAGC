@@ -50,5 +50,12 @@
         "custom_action": "MarryProcessor",
         "post_delay": 500,
         "timeout": 3000
+    },
+    "Auto_WeddingTask": {
+        "recognition": "DirectHit",
+        "action": "Custom",
+        "custom_action": "WeddingProcessor",
+        "post_delay": 500,
+        "timeout": 3000
     }
 }

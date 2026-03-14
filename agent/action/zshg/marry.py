@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from math import log
 from maa.agent.agent_server import AgentServer
 from maa.context import Context
 from maa.custom_action import CustomAction
@@ -8,6 +9,15 @@ import re
 import time
 import json
 from pathlib import Path
+
+from .role_utils import (
+    extract_potential,
+    extract_bloodlines,
+    extract_features,
+    get_highest_bloodline,
+    extract_all_role_info,
+    Bloodline,
+)
 
 
 @AgentServer.custom_action("MarryProcessor")
@@ -30,7 +40,9 @@ class MarryProcessor(CustomAction):
         """
         try:
             # 获取项目根目录
-            project_root = Path(__file__).parent.parent.parent.parent.parent
+            # marry.py 路径：agent/action/zshg/marry.py
+            # 需要向上 3 级到 agent，再向上 1 级到项目根目录
+            project_root = Path(__file__).parent.parent.parent.parent
             names_file = project_root / "assets" / "assets" / "high_blood_names.json"
 
             with open(names_file, "r", encoding="utf-8") as f:
@@ -158,17 +170,287 @@ class MarryProcessor(CustomAction):
 
         # 记录可用的相亲对象数量
         logger.info(f"可相亲队列大小：{len(available_boxes)}")
-        # 3. 进行相亲 ing
-        # 这里应该是一个循环条件，{len(available_boxes)}归零  or ObjectsCount 归零时，停止相亲。每次循环按照以下顺序执行。
-        # 3.1 长按点击进入角色详情 每个相亲对象，确定相亲对象是男还是女标记一个性别，查看该对象的最高的血统是那个国家的。根据血统映射到对应的国家。然后选择联姻国家
-        # 3.2 确定信息后 进入正式相亲页面 正式相亲
 
-        # 3.3 每次通点击“就这个”按钮，来获取目标相亲对象的姓名，多个模式（高血姓名表、混血、上自专），默认姓名表相亲，其他的暂时等待未来开发
-        # 3.3.1 首先根据上面的性别，来选择目标性别名单，比如我们相亲对象是女，目标对象则是男，反之亦然。
-        # 3.3.2 判断目标相亲对象姓名是否在对应国家，对应性别里面的高血名单里面。
-        # 3.3.3 如果存在，则直接相亲，说明匹配上了目标对象。
-        # 3.3.4 如果不存在，则点击下一个。
+        # 3. 进行相亲 ing
+        # 循环条件：available_boxes 归零 or ObjectsCount 归零时，停止相亲
+        for row_idx, col_idx, box in available_boxes:
+            logger.info(f"开始处理第{row_idx + 1}行第{col_idx + 1}列的相亲对象")
+            roleBoxCenter = box[0] + box[2] // 2, box[1] + box[3] // 2
+            # 3.1 每个相亲对象，长按点击进入角色详情
+            # TODO: 实现长按点击进入详情的逻辑
+            context.run_task(
+                "LongPressRole",
+                pipeline_override={"LongPressRole": {"roi": roleBoxCenter}},
+            )
+
+            # 3.1. 确定是男还是女
+            gender = ""
+            if context.run_recognition(
+                "RolePanel_GirlCheck",
+                context.tasker.controller.post_screencap().wait().get(),
+            ).hit:
+                gender = "女"
+            else:
+                gender = "男"
+            logger.info(f"识别性别：{gender}")
+
+            # 3.2. 查看该苗子的潜力、血脉、特性面板，检查橙特：例如太阳、科内塔、上自专等（后续开发）
+            potential, bloodline, features = extract_all_role_info(context)
+
+            highest_bloodline = get_highest_bloodline(bloodline)
+            logger.info(f"最高血统：{highest_bloodline}")
+
+            # 3.3. 根据血统确定联姻国家
+            target_country = self._get_marriage_country(highest_bloodline)
+            logger.info(f"联姻国家：{target_country}")
+
+            # 4. 确定信息后，进入正式相亲页面，正式相亲
+            # 点击进入相亲流程
+            context.run_task(
+                "CastleMarrySelectStart",
+                pipeline_override={
+                    "CastleMarrySelectCountry": {"expected": [target_country]}
+                },
+            )
+
+            # 4.1 循环匹配姓名，直到找到匹配的或放弃
+            max_attempts = 5  # 最多尝试 5 次
+            match_found = False
+
+            for attempt in range(max_attempts):
+                logger.info(f"第 {attempt + 1}/{max_attempts} 次尝试匹配姓名")
+
+                # 4.1.1 根据性别选择目标性别名单（相亲对象是女，目标对象则是男，反之亦然）
+                target_gender = "男" if gender == "女" else "女"
+                target_names = self.blood_names.get(target_country, {}).get(
+                    target_gender, []
+                )
+
+                if not target_names:
+                    logger.warning(f"{target_country} 的 {target_gender} 性姓名表为空")
+                    break
+
+                # 4.1.2 点击"就这个"按钮，触发姓名识别
+                context.run_task("CastleMarryJustThisButton")
+
+                # 4.1.3 识别显示的姓名
+                reco_result = context.run_recognition(
+                    "CastleMarryJustThisReadName",
+                    context.tasker.controller.post_screencap().wait().get(),
+                )
+
+                if not reco_result.hit:
+                    logger.warning(f"识别姓名失败, 请检查是否显示了姓名")
+                    return CustomAction.RunResult(success=False)
+
+                # 4.1.4 提取识别到的姓名
+                ocr_text = reco_result.best_result.text
+                logger.info(f"识别到的姓名：{ocr_text}")
+
+                # 4.1.5 使用正则提取姓名（格式：确认向 XXX 发送）
+                name_match = re.search(r"确认向 ([\u4e00-\u9fa5]{1,5}) 发送", ocr_text)
+                if not name_match:
+                    logger.warning(
+                        f"无法从 OCR 结果中提取姓名：{ocr_text}, 请检查是否显示了姓名"
+                    )
+                    return CustomAction.RunResult(success=False)
+
+                detected_name = name_match.group(1)
+                logger.info(f"提取到的姓名：{detected_name}")
+
+                # 4.1.6 判断姓名是否在高血名单中
+                if detected_name in target_names:
+                    logger.info(
+                        f"姓名匹配成功：{detected_name} 在 {target_country} 的{target_gender}性高血名单中"
+                    )
+                    match_found = True
+                    # 点击"确定"确认相亲
+                    # context.run_task("CastleMarryPopConfirmButton")
+                    break
+                else:
+                    logger.info(
+                        f"姓名不匹配：{detected_name} 不在高血名单中，尝试下一个"
+                    )
+                    # 取消匹配，点击"下一位"继续
+                    context.run_task("CastleMarryPopCancelButton")
+                    context.run_task("CastleMarryNextOneButton")
+
+            if not match_found:
+                logger.warning(f"经过{max_attempts}次尝试，仍未找到匹配的姓名")
+                # 点击"取消"退出
+                context.run_task("CastleMarryPopCancelButton")
+
+            logger.info(f"完成第{row_idx + 1}行第{col_idx + 1}列的处理")
 
         # 4. 结束相亲
-
         return CustomAction.RunResult(success=True)
+
+    def _get_marriage_country(self, bloodline: str) -> str:
+        """
+        根据血统确定联姻国家
+        Args:
+            bloodline: 血统名称
+        Returns:
+            国家名称
+        """
+        # 血统到国家的映射表（根据游戏设定配置）
+        bloodline_to_country = {
+            # 商会血统
+            "祖扎尔达王族": "加尔提斯商会",
+            "瓦诺遗族": "加尔提斯商会",
+            "萨尼德罕": "加尔提斯商会",
+            "宏朝贵胄": "加尔提斯商会",
+            # 法拉血统
+            "高阶精灵": "森之祈愿",
+            "法拉希尔血裔": "森之祈愿",
+            # 王族血统
+            "弗莱德里王族": "弗莱德里王族",
+            "古特雅尔": "北地自由民",
+            "切瓦利王族": "切瓦利王族",
+            "佩尔弗因王族": "佩尔弗因王族",
+            "希尔王族": "希尔王族",
+            "塞宁王族": "塞宁王族",
+            "玛夏贵族": "玛夏审判军",
+        }
+
+        return bloodline_to_country.get(bloodline, "未知")
+
+
+@AgentServer.custom_action("WeddingProcessor")
+class WeddingProcessor(CustomAction):
+    """
+    处理婚礼相关任务
+    """
+
+    # 爵位优先级映射
+    title_rank = {
+        "公爵": 4,
+        "伯爵": 3,
+        "男爵": 2,
+        "骑士": 1,
+        "无爵位": 0,
+    }
+
+    def __init__(self) -> None:
+        super().__init__()
+
+    def _extract_title_from_ocr(self, reco_result) -> str:
+        """
+        从 OCR 结果中提取爵位
+        Args:
+            reco_result: OCR 识别结果
+        Returns:
+            爵位名称
+        """
+        if not reco_result.hit:
+            return "无爵位"
+
+        # 遍历所有 OCR 结果，找爵位关键词
+        ocr_results = reco_result.all_results
+        highest_title = "无爵位"
+        highest_rank = 0
+
+        for item in ocr_results:
+            text = item.text.strip()
+            # 检查是否包含爵位关键词
+            for title, rank in self.title_rank.items():
+                if title in text and rank > highest_rank:
+                    highest_title = title
+                    highest_rank = rank
+
+        return highest_title
+
+    def run(
+        self, context: Context, argv: CustomAction.RunArg
+    ) -> CustomAction.RunResult:
+        """
+        处理婚礼事件
+        """
+        # 1. 先检查是否在婚礼界面
+        if not context.run_recognition(
+            "Event_WeddingPage",
+            context.tasker.controller.post_screencap().wait().get(),
+        ).hit:
+            logger.error("婚礼界面未进入,可能存在Bug")
+            return CustomAction.RunResult(success=False)
+
+        logger.info("婚礼界面已进入")
+
+        # 2. 处理婚礼事件
+        # 2.1 检测当前双方最高爵位
+        left_title = context.run_recognition(
+            "Event_WeddingTitleCheckLeft",
+            context.tasker.controller.post_screencap().wait().get(),
+        )
+        right_title = context.run_recognition(
+            "Event_WeddingTitleCheckRight",
+            context.tasker.controller.post_screencap().wait().get(),
+        )
+
+        # 提取左右两侧的爵位
+        left_highest = self._extract_title_from_ocr(left_title)
+        right_highest = self._extract_title_from_ocr(right_title)
+
+        # 比较爵位等级，取最高的
+        highest_title = self._compare_titles(left_highest, right_highest)
+
+        if not highest_title or highest_title == "无爵位":
+            logger.info("未识别到双方最高爵位")
+            return CustomAction.RunResult(success=False)
+
+        logger.info(f"当前双方最高爵位：{highest_title}")
+
+        # 2.2 计算当前用什么档位来结婚
+        target_banquet = self._get_target_banquet(highest_title)
+        logger.info(f"选择宴会档位：{target_banquet}")
+
+        # 3. 找到目标宴会的 button
+        context.run_task(
+            "Event_WeddingTitleButton",
+            pipeline_override={
+                "Event_WeddingTitleEntry": {"expected": [target_banquet[:2]]}
+            },
+        )
+        context.run_task("PopUpWindowConfirm")
+        context.run_task("UI_ReturnBigMap")
+        return CustomAction.RunResult(success=True)
+
+    def _compare_titles(self, left_title: str, right_title: str) -> str:
+        """
+        比较两个爵位，返回最高的爵位
+        Args:
+            left_title: 左侧爵位
+            right_title: 右侧爵位
+        Returns:
+            最高的爵位
+        """
+        left_rank = self.title_rank.get(left_title, 0)
+        right_rank = self.title_rank.get(right_title, 0)
+
+        if left_rank > right_rank:
+            return left_title
+        elif right_rank > left_rank:
+            return right_title
+        else:
+            return left_title
+
+    def _get_target_banquet(self, title: str) -> str:
+        """
+        根据爵位获取目标宴会档位
+        Args:
+            title: 爵位名称
+        Returns:
+            宴会档位名称
+        """
+        if title not in self.title_rank:
+            logger.warning(f"未识别的爵位：{title}，使用默认档位：乡村宴会")
+            return "乡村宴会"
+
+        title_level = self.title_rank[title]
+        logger.info(f"爵位等级：{title} (等级{title_level})")
+
+        # 公爵 (等级 4) 使用乡村宴会，其他使用祝福婚宴
+        if title_level >= 4:
+            return "乡村宴会"
+        else:
+            return "祝福婚宴"
