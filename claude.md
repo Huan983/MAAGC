@@ -48,7 +48,7 @@ MAAGC/
 ├── assets/                   # 游戏资源与配置
 │   ├── MaaCommonAssets/      # MAA 通用资源
 │   │   └── OCR/              # OCR 模型
-│   ├── assets/
+│   ├── table/
 │   │   ├── high_blood_names.json  # 高血统姓名表
 │   │   ├── task_blacklist.txt     # 任务黑名单
 │   │   └── task_names.json        # 任务名称列表
@@ -233,6 +233,24 @@ python -m py_compile agent/action/zshg/marry.py
 # 资源检查
 python check_resource.py
 ```
+
+### 好苗子弹窗功能测试
+
+创建 `agent/action/zshg/test_child_alert.py` 文件，包含以下测试函数：
+
+- `test_potential_evaluation()` - 测试潜力属性评估
+- `test_feature_evaluation()` - 测试特性评估
+- `test_alert_trigger()` - 测试弹窗触发逻辑
+
+### 特性配置文件
+
+在 `assets/table/` 目录下创建以下配置文件：
+
+- `good_features.json` - 好特性列表
+- `bad_features.json` - 负面特性列表
+- `race_features.json` - 种族特性列表
+
+这些文件将被用于特性评估逻辑。
 
 ## 开发参考文档
 

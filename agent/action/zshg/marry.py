@@ -36,12 +36,12 @@ class MarryProcessor(CustomAction):
     def _load_blood_names(self) -> None:
         """
         加载高阶血统姓名表
-        从 assets/assets/high_blood_names.json 读取
+        从 assets/table/high_blood_names.json 读取
         """
         try:
             # 获取项目根目录
             project_root = Path(__file__).parent.parent.parent.parent
-            names_file = project_root / "assets" / "assets" / "high_blood_names.json"
+            names_file = project_root / "assets" / "table" / "high_blood_names.json"
 
             with open(names_file, "r", encoding="utf-8") as f:
                 raw_data = json.load(f)
@@ -56,8 +56,7 @@ class MarryProcessor(CustomAction):
 
             logger.info(f"成功加载 {len(self.blood_names)} 个种族的姓名表")
             for race, names in self.blood_names.items():
-                logger.debug(f"  - {race}: 共{len(names)}个名字")
-                logger.info(f"  - {race}: {names}")
+                logger.info(f"  - {race}: 共{len(names)}个名字")
         except Exception as e:
             logger.error(f"加载姓名表失败：{e}")
             self.blood_names = {}

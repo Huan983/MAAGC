@@ -6,6 +6,8 @@ from utils import logger
 
 import re
 import time
+import json
+import os
 
 from .role_utils import (
     extract_potential,
@@ -90,6 +92,70 @@ def generate_child_name(
     return name
 
 
+def evaluate_potential(potential) -> tuple:
+    """
+    评估潜力属性，计算S及以上等级的属性个数
+    Args:
+        potential: Potential 对象
+    Returns:
+        (是否为好苗子, S及以上属性个数)
+    """
+    s_count = 0
+    for attr_value in potential.values.values():
+        grade = get_potential_grade(attr_value)
+        if grade in ["S", "SS"]:
+            s_count += 1
+    return s_count >= 3, s_count
+
+
+def load_good_features() -> list:
+    """
+    加载好特性列表
+    Returns:
+        好特性列表
+    """
+    # 配置文件路径
+    config_path = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))),
+        "assets", "table", "good_features.json"
+    )
+    
+    try:
+        with open(config_path, 'r', encoding='utf-8') as f:
+            config = json.load(f)
+            good_features = config.get("good_features", [])
+            logger.info(f"载入好特性列表成功，共 {len(good_features)} 个特性: {good_features}")
+            return good_features
+    except Exception as e:
+        logger.error(f"读取好特性配置文件失败: {e}")
+        # 返回默认好特性列表
+        default_features = ["太阳之子", "科内塔之怒"]
+        logger.info(f"使用默认好特性列表: {default_features}")
+        return default_features
+
+
+def evaluate_features(features: list, good_features: list) -> tuple:
+    """
+    评估特性，检查是否存在好特性
+    Args:
+        features: Feature 对象列表
+        good_features: 好特性列表
+    Returns:
+        (是否为好苗子, 好特性列表)
+    """
+    found_good_features = []
+    
+    for feature in features:
+        feature_name = feature.name
+        # 检查是否包含好特性（考虑OCR识别误差）
+        for good_feature in good_features:
+            if good_feature in feature_name:
+                found_good_features.append(feature_name)
+                break
+    
+    return len(found_good_features) > 0, found_good_features
+
+
 # 爵位等级
 title_rank: dict = {
     "公爵": 4,
@@ -123,6 +189,8 @@ class ChildRec(CustomAction):
         self.potential = None
         self.bloodline = None
         self.features = []
+        # 加载好特性列表，作为成员变量反复使用
+        self.good_features = load_good_features()
 
     def extract_parent_info(
         self, context: Context, is_father: bool = True
@@ -277,11 +345,64 @@ class ChildRec(CustomAction):
         )
         logger.info(f"子孙命名：{child_name}")
 
-        # 6. 输入子孙命名
-        context.run_task("BackButton_500ms")
-        context.run_task(
-            "PannelChildSetName",
-            pipeline_override={"PannelChildSetNameCopy": {"input_text": child_name}},
-        )
+        # 6. 评估是否为好苗子
+        is_good_potential, s_count = evaluate_potential(self.potential)
+        is_good_feature, good_feature_list = evaluate_features(self.features, self.good_features)
+
+        # 7. 如果是好苗子，弹出弹窗让用户自己命名
+        if is_good_potential or is_good_feature:
+            # 构建弹窗内容
+            alert_content = f"🎉 发现好苗子！\n\n"
+            
+            # 潜力信息
+            alert_content += "【潜力属性】\n"
+            for attr_name, attr_value in self.potential.values.items():
+                grade = get_potential_grade(attr_value)
+                alert_content += f"{attr_name}: {grade} ({attr_value:.4f})\n"
+            alert_content += f"\nS及以上属性个数: {s_count}\n"
+            
+            # 特性信息
+            alert_content += "\n【特性】\n"
+            if good_feature_list:
+                alert_content += "好特性：" + ", ".join(good_feature_list) + "\n"
+            else:
+                alert_content += "无好特性\n"
+            
+            # 血脉信息
+            alert_content += "\n【血脉】\n"
+            if self.bloodline.bloodlines:
+                for blood_name, blood_percent in self.bloodline.bloodlines.items():
+                    alert_content += f"{blood_name}: {blood_percent}%\n"
+            else:
+                alert_content += "无血脉信息\n"
+            
+            # 其他信息
+            alert_content += f"\n【其他信息】\n"
+            alert_content += f"推荐名字: {child_name}\n"
+            alert_content += f"最高爵位: {highest_title}\n"
+            alert_content += f"孩子序号: 第{child_index}个\n\n"
+            alert_content += "请在游戏中手动为好苗子命名！"
+            
+            # 弹出阻塞式弹窗
+            context.focus({
+                "Node.Action.GoodChildFound": {
+                    "content": alert_content,
+                    "display": "modal"
+                }
+            })
+            logger.info("弹出好苗子弹窗，等待用户手动命名")
+
+            # 等待用户手动命名（暂停执行）
+            # 这里不自动输入名字，让用户自己命名
+            context.run_task("BackButton_500ms")
+            # 仅打开命名界面，不自动输入
+            context.run_task("PannelChildSetName")
+        else:
+            # 普通苗子，自动输入命名
+            context.run_task("BackButton_500ms")
+            context.run_task(
+                "PannelChildSetName",
+                pipeline_override={"PannelChildSetNameCopy": {"input_text": child_name}},
+            )
 
         return CustomAction.RunResult(success=True)

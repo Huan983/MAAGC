@@ -9,6 +9,8 @@ from maa.custom_action import CustomAction
 from utils import logger
 import re
 import time
+import json
+import os
 
 
 @dataclass
@@ -384,6 +386,69 @@ def get_potential_grade(value: float) -> str:
         if min_val <= value < max_val:
             return grade
     return "E"
+
+
+def extract_facial_features(context: Context) -> list:
+    """
+    提取角色面部特征
+    Args:
+        context: MAA 上下文
+    Returns:
+        Feature 对象列表
+    """
+    # 1. 加载面部特征与特性映射
+    mapping_path = os.path.join(
+        os.path.dirname(__file__),
+        "..",
+        "..",
+        "..",
+        "assets",
+        "table",
+        "facial_features_mapping.json",
+    )
+    try:
+        with open(mapping_path, "r", encoding="utf-8") as f:
+            mapping = json.load(f)
+        facial_features_mapping = mapping.get("facial_features", {})
+    except Exception as e:
+        logger.error(f"加载面部特征映射文件失败: {e}")
+        return []
+
+    # 2. 识别面部特征
+    facial_features = []
+
+    # 识别上古灵性耳朵
+    reco_ears = context.run_recognition(
+        "FacialFeature_AncientSpiritEars",
+        context.tasker.controller.post_screencap().wait().get(),
+    )
+    if reco_ears.hit:
+        feature_name = facial_features_mapping.get("AncientSpiritEars", "上古灵性")
+        facial_features.append(Feature(name=feature_name))
+        logger.debug(f"识别到面部特征：{feature_name}")
+
+    # 识别专注之瞳
+    reco_eyes = context.run_recognition(
+        "FacialFeature_FocusedEyes",
+        context.tasker.controller.post_screencap().wait().get(),
+    )
+    if reco_eyes.hit:
+        feature_name = facial_features_mapping.get("FocusedEyes", "专注之瞳")
+        facial_features.append(Feature(name=feature_name))
+        logger.debug(f"识别到面部特征：{feature_name}")
+
+    # 识别自然共感眉毛
+    reco_brows = context.run_recognition(
+        "FacialFeature_NaturalEmpathyBrows",
+        context.tasker.controller.post_screencap().wait().get(),
+    )
+    if reco_brows.hit:
+        feature_name = facial_features_mapping.get("NaturalEmpathyBrows", "自然共感")
+        facial_features.append(Feature(name=feature_name))
+        logger.debug(f"识别到面部特征：{feature_name}")
+
+    logger.info(f"面部特征识别完成，共识别到 {len(facial_features)} 个面部特征")
+    return facial_features
 
 
 def extract_all_role_info(context: Context) -> tuple:

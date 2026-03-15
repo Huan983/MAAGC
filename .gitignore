@@ -441,6 +441,7 @@ enc_temp_folder/*
 
 # Build
 deps/*
+.trae/
 !deps/tools/
 deps/tools/*
 !deps/tools/*.schema.json

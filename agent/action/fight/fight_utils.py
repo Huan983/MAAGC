@@ -247,6 +247,7 @@ def _process_fight(context: Context) -> bool:
 
     context.run_task("FightStart")
     round_count = 0
+    max_round_warning = 20
     while True:
         img = context.tasker.controller.post_screencap().wait().get()
         if context.tasker.stopping:
@@ -260,6 +261,11 @@ def _process_fight(context: Context) -> bool:
             context.run_task("FightVictory")
             logger.info(f"\n战斗胜利（{round_count}回合）")
             break
+
+        if round_count >= max_round_warning:
+            logger.warning(
+                f"⚠️ 战斗已进行 {round_count} 回合，可能存在卡顿问题，请检查游戏状态"
+            )
 
         context.run_task("FightEndRound")
         round_count += 1

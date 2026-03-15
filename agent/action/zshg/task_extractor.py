@@ -1,6 +1,8 @@
 from dataclasses import dataclass
 from typing import List, Optional, Dict, Union
 from maa.define import OCRResult, Rect
+import json
+import os
 
 from utils import logger
 
@@ -21,20 +23,37 @@ class TaskExtractor:
         self.roi = roi or [0, 0, 1920, 1080]
         self.roi_rect = Rect(*self.roi)
         self.accept_buttons = []
-        self.task_names_file = "assets/task_names.json"
+        # 使用绝对路径
+        project_root = os.path.dirname(
+            os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+        )
+        self.task_names_file = os.path.join(
+            project_root, "assets", "table", "task_names.json"
+        )
+        logger.info(f"TaskExtractor初始化，项目根目录: {project_root}")
+        logger.info(f"任务名称文件路径: {self.task_names_file}")
         self.known_task_names = self._load_task_names()
-        self.task_blacklist_file = "assets/task_blacklist.txt"
+        self.task_blacklist_file = os.path.join(
+            project_root, "assets", "table", "task_blacklist.json"
+        )
+        logger.info(f"黑名单文件路径: {self.task_blacklist_file}")
         self.task_blacklist = self._load_task_blacklist()
 
     def _load_task_blacklist(self):
         try:
-            import os
-
             if os.path.exists(self.task_blacklist_file):
                 with open(self.task_blacklist_file, "r", encoding="utf-8") as f:
-                    return set(line.strip() for line in f if line.strip())
-            return set()
-        except Exception:
+                    data = json.load(f)
+                    blacklist = set(data.get("blacklist", []))
+                    logger.info(
+                        f"载入黑名单成功，共 {len(blacklist)} 个任务: {list(blacklist)}"
+                    )
+                    return blacklist
+            else:
+                logger.info(f"黑名单文件不存在: {self.task_blacklist_file}")
+                return set()
+        except Exception as e:
+            logger.error(f"载入黑名单失败: {e}")
             return set()
 
     def extract_tasks(self, ocr_results: List) -> List[TaskInfo]:
@@ -123,14 +142,17 @@ class TaskExtractor:
             if os.path.exists(self.task_names_file):
                 with open(self.task_names_file, "r", encoding="utf-8") as f:
                     task_names = json.load(f)
+                    logger.info(f"载入任务名称列表成功，共 {len(task_names)} 个任务")
                     return set(task_names)
             else:
                 # 文件不存在，创建空文件
                 os.makedirs(os.path.dirname(self.task_names_file), exist_ok=True)
                 with open(self.task_names_file, "w", encoding="utf-8") as f:
                     json.dump([], f, ensure_ascii=False, indent=2)
+                logger.info(f"任务名称文件不存在，已创建空文件: {self.task_names_file}")
                 return set()
-        except Exception:
+        except Exception as e:
+            logger.error(f"载入任务名称列表失败: {e}")
             return set()
 
     def _save_task_names(self):
