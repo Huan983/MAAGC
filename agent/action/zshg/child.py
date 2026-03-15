@@ -36,6 +36,7 @@ def generate_child_name(
     bloodline,
     features: list,
     highest_title: str,
+    child_index: int = 1,
 ) -> str:
     """
     生成子孙命名
@@ -77,8 +78,11 @@ def generate_child_name(
 
     feature_part = "".join(feature_chars[:3])  # 最多取 3 个特性
 
-    # 3. 爵位取第一个汉字
-    title_short = highest_title[0] if highest_title else ""
+    # 3. 爵位处理：第三个及以后出生的孩子使用"骑"
+    if child_index >= 3:
+        title_short = "骑"
+    else:
+        title_short = highest_title[0] if highest_title else ""
 
     # 4. 组合命名
     name = f"{attr_part}{feature_part}{title_short}"
@@ -234,6 +238,18 @@ class ChildRec(CustomAction):
 
         highest_title, count = self.compare_parent_titles(father_info, mother_info)
         logger.info(f"最高爵位是{highest_title}，最高爵位有{count}个")
+        # 1.1 识别是第几个出生的孩子，只有前两个才有公爵，后面的都没有公爵了
+        child_index = context.run_recognition(
+            "PannelGetChildIndex",
+            context.tasker.controller.post_screencap().wait().get(),
+        )
+        if not child_index.hit:
+            logger.error("识别第几个出生的孩子失败")
+            return CustomAction.RunResult(success=False)
+        child_index = int(
+            child_index.text.strip().replace("第", "").replace("个孩子", "")
+        )
+        logger.info(f"是第{child_index}个出生")
 
         # 2. 提取天赋属性、血脉、特性（完整识别流程）
         context.run_task("PannelChildInfoButton")
@@ -252,7 +268,7 @@ class ChildRec(CustomAction):
         # 5. 生成子孙命名
         # 注意：这里需要在 extract_attributes 中保存 potential 对象
         child_name = generate_child_name(
-            self.potential, self.bloodline, self.features, highest_title
+            self.potential, self.bloodline, self.features, highest_title, child_index
         )
         logger.info(f"子孙命名：{child_name}")
 

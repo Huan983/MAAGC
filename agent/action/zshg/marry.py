@@ -218,10 +218,11 @@ class MarryProcessor(CustomAction):
             logger.info(f"最高血统：{highest_bloodline}")
 
             # 3.3. 根据血统确定联姻国家和种族
-            target_country = self._get_marriage_country(highest_bloodline)
-            target_race = highest_bloodline  # 最高血统即为种族，用于匹配姓名表
+            target_race, target_country = self._get_marriage_info(
+                highest_bloodline
+            )  # 使用模糊匹配获取种族和国家
             logger.info(f"联姻国家：{target_country}，联姻种族：{target_race}")
-            if not target_country:
+            if not target_country or target_country == "未知":
                 logger.warning(f"未识别到联姻国家")
                 continue
 
@@ -304,25 +305,22 @@ class MarryProcessor(CustomAction):
         # 4. 结束相亲
         return CustomAction.RunResult(success=True)
 
-    def _get_marriage_country(self, bloodline: str) -> str:
+    def _get_marriage_info(self, bloodline: str) -> tuple[str, str]:
         """
-        根据血统确定联姻国家
+        根据血统确定联姻种族和国家（支持模糊匹配）
         Args:
             bloodline: 血统名称
         Returns:
-            国家名称
+            (种族名称, 国家名称) 元组
         """
-        # 血统到国家的映射表（根据游戏设定配置）
-        bloodline_to_country = {
-            # 商会血统
+        # 种族和国家映射配置
+        race_country_mapping = {
             "祖扎尔达王族": "加尔提斯商会",
             "瓦诺遗族": "加尔提斯商会",
             "萨尼德罕": "加尔提斯商会",
             "宏朝贵胄": "加尔提斯商会",
-            # 法拉血统
             "高阶精灵": "森之祈愿",
             "法拉希尔血裔": "森之祈愿",
-            # 王族血统
             "弗莱德里王族": "弗莱德里王族",
             "古特雅尔": "北地自由民",
             "切瓦利王族": "切瓦利王族",
@@ -332,7 +330,36 @@ class MarryProcessor(CustomAction):
             "玛夏贵族": "玛夏审判军",
         }
 
-        return bloodline_to_country.get(bloodline, "未知")
+        # 模糊匹配关键词映射
+        fuzzy_mapping = {
+            "祖扎": ("祖扎尔达王族", "加尔提斯商会"),
+            "瓦诺": ("瓦诺遗族", "加尔提斯商会"),
+            "萨尼": ("萨尼德罕", "加尔提斯商会"),
+            "宏朝": ("宏朝贵胄", "加尔提斯商会"),
+            "精灵": ("高阶精灵", "森之祈愿"),
+            "法拉": ("法拉希尔血裔", "森之祈愿"),
+            "弗莱": ("弗莱德里王族", "弗莱德里王族"),
+            "古特": ("古特雅尔", "北地自由民"),
+            "切瓦利": ("切瓦利王族", "切瓦利王族"),
+            "佩尔": ("佩尔弗因王族", "佩尔弗因王族"),
+            "希尔": ("希尔王族", "希尔王族"),
+            "塞宁": ("塞宁王族", "塞宁王族"),
+            "玛夏": ("玛夏贵族", "玛夏审判军"),
+        }
+
+        # 精确匹配
+        if bloodline in race_country_mapping:
+            race = bloodline
+            country = race_country_mapping[bloodline]
+            return race, country
+
+        # 模糊匹配
+        for keyword, (race, country) in fuzzy_mapping.items():
+            if keyword in bloodline:
+                return race, country
+
+        # 都匹配不到，返回原始值和未知国家
+        return bloodline, "未知"
 
 
 @AgentServer.custom_action("WeddingProcessor")

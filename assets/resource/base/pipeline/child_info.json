@@ -39,6 +39,19 @@
             154
         ]
     },
+    "PannelGetChildIndex": {
+        "recognition": "OCR",
+        "expected": [
+            "第[0-9]+个孩子"
+        ],
+        "roi": [
+            56,
+            480,
+            604,
+            97
+        ],
+        "timeout": 2000
+    },
     "PropertyPanelSwipeUp": {
         "action": "Swipe",
         "begin": [
