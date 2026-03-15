@@ -62,7 +62,7 @@ PanelPropertyTable = {
 BLOODLINE_CONFIG = {
     "name_offset_x": -10,
     "name_offset_y": -10,
-    "name_width": 127,
+    "name_width": 200,
     "percent_offset_x": 548,
     "percent_offset_y": 50,
     "percent_width": 73,
@@ -98,9 +98,9 @@ def extract_potential(context: Context) -> Potential:
         val_x = anchor_x + offsets["val_offset"][0]
         val_y = anchor_y + offsets["val_offset"][1]
 
-        # 定义 ROI
-        attr_roi = [attr_x, attr_y, 120, 35]
-        val_roi = [val_x, val_y, 120, 35]
+        # 定义 ROI (左边扩大 20 像素)
+        attr_roi = [attr_x - 20, attr_y, 160, 35]  # 宽度增加 20 像素
+        val_roi = [val_x - 20, val_y, 160, 35]  # 宽度增加 20 像素
 
         # 识别属性名
         reco_attr = context.run_recognition(
@@ -208,12 +208,12 @@ def extract_bloodlines(context: Context) -> Bloodline:
     name_results = [
         item
         for item in reco_names.all_results
-        if item.score > 0.9 and item.text.strip() and item.text.strip() != "血统"
+        if item.score > 0.6 and item.text.strip() and item.text.strip() != "血统"
     ]
     percent_results = [
         item
         for item in reco_percents.all_results
-        if item.score > 0.9 and item.text.strip()
+        if item.score > 0.6 and item.text.strip()
     ]
 
     for i in range(min(len(name_results), len(percent_results))):
@@ -254,7 +254,7 @@ def extract_features(context: Context, max_swipe_count: int = 5) -> list:
     )
 
     # 2. 定义特性识别区域
-    feature_roi_first = [
+    feature_roi = [
         feature_anchor_x,
         feature_anchor_y + feature_anchor_rect[3],
         600,
@@ -271,9 +271,6 @@ def extract_features(context: Context, max_swipe_count: int = 5) -> list:
         consecutive_failures < max_consecutive_failures
         and swipe_count < max_swipe_count
     ):
-        # 第一次使用动态 ROI，后续使用固定 ROI
-        feature_roi = feature_roi_first if swipe_count == 0 else [21, 568, 686, 459]
-
         # 识别当前页特性
         reco_features = context.run_recognition(
             "PanelFeatureCheck",
@@ -343,6 +340,7 @@ def extract_features(context: Context, max_swipe_count: int = 5) -> list:
             swipe_count += 1
 
     logger.info(f"特性识别完成，共识别到 {len(all_features)} 个特性")
+    logger.debug(f"特性列表：{all_features}")
     return all_features
 
 
