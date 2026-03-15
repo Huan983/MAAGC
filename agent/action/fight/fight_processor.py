@@ -30,13 +30,20 @@ def detect_and_manage_event(context: Context, screenshot) -> str:
         return "mercenary_join"
     elif context.run_recognition("Event_MercenaryBaby", screenshot).hit:
         logger.info("检测到佣兵生娃事件")
-        # 使用新的子项信息识别功能，进行信息识别和命名
         context.run_task("Auto_PannelCheck")
         return "mercenary_baby"
     elif context.run_recognition("Event_HarvestFestival", screenshot).hit:
         logger.info("检测到丰收节事件")
         context.run_task("Event_HarvestFestivalDealWith")
         return "harvest_festival"
+    elif context.run_recognition("Event_ConfessionSuccess", screenshot).hit:
+        logger.info("检测到告白成功事件")
+        context.run_task("Event_ConfessionSuccess")
+        return "confession_success"
+    elif context.run_recognition("Event_ConfessionFail", screenshot).hit:
+        logger.info("检测到告白失败事件")
+        context.run_task("Event_ConfessionFailGiveUp")
+        return "confession_fail"
     else:
         return None
 
