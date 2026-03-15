@@ -251,7 +251,6 @@ class ChildRec(CustomAction):
 
         # 5. 生成子孙命名
         # 注意：这里需要在 extract_attributes 中保存 potential 对象
-        # 暂时使用空对象作为示例
         child_name = generate_child_name(
             self.potential, self.bloodline, self.features, highest_title
         )
