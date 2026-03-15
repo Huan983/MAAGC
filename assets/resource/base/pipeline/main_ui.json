@@ -560,5 +560,23 @@
         "target": true,
         "post_delay": 200,
         "timeout": 2000
+    },
+    "UI_PopInform": {
+        "focus": {
+            "Node.Action.Succeeded": {
+                "content": "操作成功",
+                "display": [
+                    "log",
+                    "modal"
+                ]
+            },
+            "Node.Action.Failed": {
+                "content": "操作失败",
+                "display": [
+                    "log",
+                    "modal"
+                ]
+            }
+        }
     }
 }

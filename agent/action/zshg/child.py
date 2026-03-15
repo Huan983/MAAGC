@@ -117,14 +117,18 @@ def load_good_features() -> list:
     # 配置文件路径
     config_path = os.path.join(
         os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))),
-        "assets", "table", "good_features.json"
+        "assets",
+        "table",
+        "good_features.json",
     )
-    
+
     try:
-        with open(config_path, 'r', encoding='utf-8') as f:
+        with open(config_path, "r", encoding="utf-8") as f:
             config = json.load(f)
             good_features = config.get("good_features", [])
-            logger.info(f"载入好特性列表成功，共 {len(good_features)} 个特性: {good_features}")
+            logger.info(
+                f"载入好特性列表成功，共 {len(good_features)} 个特性: {good_features}"
+            )
             return good_features
     except Exception as e:
         logger.error(f"读取好特性配置文件失败: {e}")
@@ -144,7 +148,7 @@ def evaluate_features(features: list, good_features: list) -> tuple:
         (是否为好苗子, 好特性列表)
     """
     found_good_features = []
-    
+
     for feature in features:
         feature_name = feature.name
         # 检查是否包含好特性（考虑OCR识别误差）
@@ -152,7 +156,7 @@ def evaluate_features(features: list, good_features: list) -> tuple:
             if good_feature in feature_name:
                 found_good_features.append(feature_name)
                 break
-    
+
     return len(found_good_features) > 0, found_good_features
 
 
@@ -183,14 +187,19 @@ class ChildRec(CustomAction):
     识别子项信息
     """
 
-    def __init__(self) -> None:
-        """ """
+    def __init__(self, child_alert_enabled: bool = False) -> None:
+        """
+        Args:
+            child_alert_enabled: 是否启用好苗子提醒功能，默认关闭
+        """
         super().__init__()
         self.potential = None
         self.bloodline = None
         self.features = []
         # 加载好特性列表，作为成员变量反复使用
         self.good_features = load_good_features()
+        # 好苗子提醒开关
+        self.child_alert_enabled = child_alert_enabled
 
     def extract_parent_info(
         self, context: Context, is_father: bool = True
@@ -347,27 +356,29 @@ class ChildRec(CustomAction):
 
         # 6. 评估是否为好苗子
         is_good_potential, s_count = evaluate_potential(self.potential)
-        is_good_feature, good_feature_list = evaluate_features(self.features, self.good_features)
+        is_good_feature, good_feature_list = evaluate_features(
+            self.features, self.good_features
+        )
 
-        # 7. 如果是好苗子，弹出弹窗让用户自己命名
-        if is_good_potential or is_good_feature:
+        # 7. 如果是好苗子，根据开关决定是否弹出弹窗
+        if (is_good_potential or is_good_feature) and self.child_alert_enabled:
             # 构建弹窗内容
             alert_content = f"🎉 发现好苗子！\n\n"
-            
+
             # 潜力信息
             alert_content += "【潜力属性】\n"
             for attr_name, attr_value in self.potential.values.items():
                 grade = get_potential_grade(attr_value)
                 alert_content += f"{attr_name}: {grade} ({attr_value:.4f})\n"
             alert_content += f"\nS及以上属性个数: {s_count}\n"
-            
+
             # 特性信息
             alert_content += "\n【特性】\n"
             if good_feature_list:
                 alert_content += "好特性：" + ", ".join(good_feature_list) + "\n"
             else:
                 alert_content += "无好特性\n"
-            
+
             # 血脉信息
             alert_content += "\n【血脉】\n"
             if self.bloodline.bloodlines:
@@ -375,34 +386,39 @@ class ChildRec(CustomAction):
                     alert_content += f"{blood_name}: {blood_percent}%\n"
             else:
                 alert_content += "无血脉信息\n"
-            
+
             # 其他信息
             alert_content += f"\n【其他信息】\n"
             alert_content += f"推荐名字: {child_name}\n"
             alert_content += f"最高爵位: {highest_title}\n"
             alert_content += f"孩子序号: 第{child_index}个\n\n"
             alert_content += "请在游戏中手动为好苗子命名！"
-            
+
             # 弹出阻塞式弹窗
-            context.focus({
-                "Node.Action.GoodChildFound": {
-                    "content": alert_content,
-                    "display": "modal"
-                }
-            })
+            context.run_task(
+                "UI_PopInform",
+                pipeline_override={"Node.Action.Succeeded": {"content": alert_content}},
+            )
             logger.info("弹出好苗子弹窗，等待用户手动命名")
 
             # 等待用户手动命名（暂停执行）
             # 这里不自动输入名字，让用户自己命名
-            context.run_task("BackButton_500ms")
-            # 仅打开命名界面，不自动输入
-            context.run_task("PannelChildSetName")
         else:
-            # 普通苗子，自动输入命名
+            # 普通苗子或关闭提醒功能，自动输入命名
+            if is_good_potential or is_good_feature:
+                # 记录好苗子信息但不弹出弹窗
+                logger.info(f"🎉 发现好苗子（提醒功能已关闭）")
+                logger.info(f"  潜力: S及以上属性{s_count}个")
+                if good_feature_list:
+                    logger.info(f"  特性: {', '.join(good_feature_list)}")
+                logger.info(f"  推荐命名: {child_name}")
+
             context.run_task("BackButton_500ms")
             context.run_task(
                 "PannelChildSetName",
-                pipeline_override={"PannelChildSetNameCopy": {"input_text": child_name}},
+                pipeline_override={
+                    "PannelChildSetNameCopy": {"input_text": child_name}
+                },
             )
 
         return CustomAction.RunResult(success=True)

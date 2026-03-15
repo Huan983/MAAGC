@@ -19,6 +19,12 @@ class TaskInfo:
 
 
 class TaskExtractor:
+    # 类变量，用于缓存数据，避免重复加载
+    _task_blacklist_cache = None
+    _task_blacklist_file_cache = None
+    _task_names_cache = None
+    _task_names_file_cache = None
+
     def __init__(self, roi: List[int] = None):
         self.roi = roi or [0, 0, 1920, 1080]
         self.roi_rect = Rect(*self.roi)
@@ -32,12 +38,48 @@ class TaskExtractor:
         )
         logger.info(f"TaskExtractor初始化，项目根目录: {project_root}")
         logger.info(f"任务名称文件路径: {self.task_names_file}")
-        self.known_task_names = self._load_task_names()
+
+        # 使用缓存的类变量，避免重复加载
+        self.known_task_names = self._get_cached_task_names()
         self.task_blacklist_file = os.path.join(
             project_root, "assets", "table", "task_blacklist.json"
         )
         logger.info(f"黑名单文件路径: {self.task_blacklist_file}")
-        self.task_blacklist = self._load_task_blacklist()
+
+        # 使用缓存的类变量，避免重复加载
+        self.task_blacklist = self._get_cached_task_blacklist()
+
+    def _get_cached_task_blacklist(self):
+        """获取缓存的task黑名单，避免重复加载"""
+        # 如果文件路径发生变化或缓存为空，重新加载
+        if (
+            TaskExtractor._task_blacklist_cache is None
+            or TaskExtractor._task_blacklist_file_cache != self.task_blacklist_file
+        ):
+
+            TaskExtractor._task_blacklist_file_cache = self.task_blacklist_file
+            TaskExtractor._task_blacklist_cache = self._load_task_blacklist()
+            logger.info("黑名单缓存已更新")
+        else:
+            logger.info("使用缓存的黑名单数据")
+
+        return TaskExtractor._task_blacklist_cache
+
+    def _get_cached_task_names(self):
+        """获取缓存的task名称列表，避免重复加载"""
+        # 如果文件路径发生变化或缓存为空，重新加载
+        if (
+            TaskExtractor._task_names_cache is None
+            or TaskExtractor._task_names_file_cache != self.task_names_file
+        ):
+
+            TaskExtractor._task_names_file_cache = self.task_names_file
+            TaskExtractor._task_names_cache = self._load_task_names()
+            logger.info("任务名称缓存已更新")
+        else:
+            logger.info("使用缓存的任务名称数据")
+
+        return TaskExtractor._task_names_cache
 
     def _load_task_blacklist(self):
         try:
@@ -239,10 +281,12 @@ class TaskExtractor:
 
                     # 如果垂直间距大于阈值，认为是新任务
                     if box_y - prev_box_y > 50:
-                        # 将新识别的任务名称添加到已知列表
-                        self.known_task_names.add(text)
-                        # 保存到文件
-                        self._save_task_names()
+                        # 检查任务名称是否已存在，避免重复写入
+                        if text not in self.known_task_names:
+                            # 将新识别的任务名称添加到已知列表
+                            self.known_task_names.add(text)
+                            # 保存到文件
+                            self._save_task_names()
 
                         groups.append(current_group)
                         current_group = [res]
@@ -251,8 +295,10 @@ class TaskExtractor:
                         current_group.append(res)
                 else:
                     # 第一个元素，直接作为新任务的开始
-                    self.known_task_names.add(text)
-                    self._save_task_names()
+                    # 检查任务名称是否已存在，避免重复写入
+                    if text not in self.known_task_names:
+                        self.known_task_names.add(text)
+                        self._save_task_names()
                     current_group = [res]
             else:
                 # 非任务名称，添加到当前组
