@@ -370,8 +370,49 @@
         "post_delay": 1000,
         "timeout": 2000,
         "next": [
-            "FightResultReceiveReward"
+            "FightResultReceiveReward",
+            "[JumpBack]FightReusltSkillUp",
+            "[JumpBack]FightReusltLevelUp"
         ]
+    },
+    "FightReusltSkillUp": {
+        "recognition": "OCR",
+        "roi": [
+            241,
+            201,
+            260,
+            187
+        ],
+        "expected": [
+            "学会"
+        ],
+        "action": "Click",
+        "target": true,
+        "target_offset": [
+            0,
+            350,
+            0,
+            0
+        ],
+        "post_delay": 1000,
+        "timeout": 2000
+    },
+    "FightReusltLevelUp": {
+        "recognition": "OCR",
+        "roi": [
+            241,
+            201,
+            260,
+            187
+        ],
+        "expected": [
+            "等级",
+            "提升"
+        ],
+        "action": "Click",
+        "target": true,
+        "post_delay": 1000,
+        "timeout": 2000
     },
     "FightResultReceiveReward": {
         "recognition": "OCR",

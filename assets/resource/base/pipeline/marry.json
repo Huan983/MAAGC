@@ -100,6 +100,7 @@
             690,
             524
         ],
+        "threshold": 0.6,
         "action": "Click",
         "post_delay": 1000,
         "timeout": 2000
@@ -176,8 +177,27 @@
         "post_delay": 1000,
         "timeout": 2000,
         "next": [
-            "CastleMarrySelectCountry"
+            "CastleMarrySelectCountry",
+            "[JumpBack]CastleMarrySelectCountrySweepDown"
         ]
+    },
+    "CastleMarrySelectCountrySweepDown": {
+        "recognition": "DirectHit",
+        "action": "Swipe",
+        "begin": [
+            378,
+            654,
+            1,
+            1
+        ],
+        "end": [
+            383,
+            557,
+            1,
+            1
+        ],
+        "post_delay": 500,
+        "timeout": 2000
     },
     //选择联姻国家
     "CastleMarrySelectCountry": {
@@ -295,40 +315,24 @@
         "post_delay": 500,
         "timeout": 2000,
         "next": [
-            "CastleMarryPopConfirmButton"
+            "PopUpWindowConfirm"
         ]
     },
-    "CastleMarryPopConfirmButton": {
-        "recognition": "OCR",
-        "expected": [
-            "确定"
-        ],
+    "CastleMarryLeave": {
+        "recognition": "TemplateMatch",
+        "template": "return.png",
         "roi": [
-            99,
-            707,
-            526,
-            160
+            603,
+            0,
+            117,
+            140
         ],
-        "action": "Click",
         "post_delay": 500,
         "timeout": 2000,
-        "next": []
-    },
-    "CastleMarryPopCancelButton": {
-        "recognition": "OCR",
-        "expected": [
-            "取消"
-        ],
-        "roi": [
-            99,
-            707,
-            526,
-            160
-        ],
         "action": "Click",
-        "post_delay": 500,
-        "timeout": 2000,
-        "next": []
+        "next": [
+            "PopUpWindowConfirm"
+        ]
     },
     //城堡宴会
     "CastleParty": {

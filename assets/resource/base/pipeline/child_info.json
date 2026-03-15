@@ -153,9 +153,10 @@
         "roi": [
             95,
             673,
-            150,
+            200,
             234
         ],
+        "threshold": 0.6,
         "order_by": "Vertical",
         "post_delay": 200,
         "timeout": 2000
@@ -222,22 +223,17 @@
         ]
     },
     "PannelChildSetName": {
-        "recognition": "TemplateMatch",
-        "template": "DetailButton.png",
+        "recognition": "OCR",
+        "expected": [
+            "[\u4E00-\u9FFF]+"
+        ],
         "roi": [
-            12,
-            997,
-            246,
-            208
+            253,
+            1051,
+            255,
+            111
         ],
         "action": "Click",
-        "target": true,
-        "target_offset": [
-            150,
-            40,
-            0,
-            0
-        ],
         "post_delay": 500,
         "timeout": 2000,
         "next": [
@@ -247,7 +243,7 @@
     "PannelChildSetNameCopy": {
         "recognition": "DirectHit",
         "action": "InputText",
-        "input_text": "",
+        "input_text": "无名",
         "post_delay": 500,
         "timeout": 2000,
         "next": [

@@ -346,7 +346,9 @@
         "action": "Click",
         "post_delay": 500,
         "timeout": 2000,
-        "next": []
+        "next": [
+            "Auto_WeddingTask"
+        ]
     },
     // 检查当前是否婚礼页面
     "Event_WeddingPage": {
@@ -456,8 +458,29 @@
     // 事件：表白失败
     "Event_ConfessionFail": {
         "recognition": "OCR",
+        "roi": [
+            195,
+            176,
+            351,
+            164
+        ],
         "expected": [
             "表白失败"
+        ],
+        "action": "Click",
+        "post_delay": 500,
+        "timeout": 2000
+    },
+    "Event_ConfessionFailGiveUp": {
+        "recognition": "OCR",
+        "roi": [
+            82,
+            1060,
+            574,
+            155
+        ],
+        "expected": [
+            "放弃"
         ],
         "action": "Click",
         "post_delay": 500,
