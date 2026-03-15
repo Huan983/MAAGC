@@ -17,6 +17,7 @@ MaaGC 是一款基于 [MaaFramework](https://github.com/MaaXYZ/MaaFramework) 开
 | 启动游戏 | 自动启动游戏客户端 | GameStartUp |
 | 推月 | 月度任务自动化 | Auto_FightTask |
 | 推年 | 年度任务自动化 | Auto_YearlyTask |
+| 每日任务 | 综合处理每日礼包、市场折扣、商城礼包和悬赏令 | Auto_DailyTask |
 | 市场折扣 | 大地图市场管理 | BigMapMarket |
 | 商城免费礼包 | 商城物品领取 | BigMapMall |
 | 悬赏令 | 悬赏令令牌领取 | BigMapRewardToken |
@@ -35,29 +36,68 @@ MAAGC/
 │   │   │   └── fight_utils.py
 │   │   └── zshg/            # 诸神皇冠/百年骑士团游戏逻辑
 │   │       ├── child.py          # 孩子信息识别系统
+│   │       ├── daily_task.py     # 每日任务处理
 │   │       ├── marry.py           # 相亲/婚礼系统
 │   │       ├── role_utils.py      # 角色信息通用模块
 │   │       └── task_extractor.py  # 任务提取器
 │   ├── utils/
+│   │   ├── __init__.py
 │   │   └── logger.py
+│   ├── agent_allfile.py     # 代理文件汇总
 │   └── main.py
 ├── assets/                   # 游戏资源与配置
+│   ├── MaaCommonAssets/      # MAA 通用资源
+│   │   └── OCR/              # OCR 模型
 │   ├── assets/
 │   │   ├── high_blood_names.json  # 高血统姓名表
-│   │   └── task_names.json
-│   └── resource/
-│       └── base/
-│           └── pipeline/     # OCR/Pipeline 配置
-│               ├── child_info.json   # 孩子信息识别配置
-│               ├── marry.json        # 相亲系统配置
-│               ├── event_utils.json  # 事件工具配置
-│               ├── fight_utils.json  # 战斗工具配置
-│               └── main_ui.json      # 主界面配置
-├── docs/                     # 中文文档
-│   └── zh_cn/
+│   │   ├── task_blacklist.txt     # 任务黑名单
+│   │   └── task_names.json        # 任务名称列表
+│   ├── resource/
+│   │   └── base/
+│   │       ├── image/        # 图片资源
+│   │       │   ├── Marry/    # 结婚相关图片
+│   │       │   └── UI/       # 界面图片
+│   │       ├── model/        # 模型文件
+│   │       └── pipeline/     # OCR/Pipeline 配置
+│   │           ├── auto_task.json     # 自动任务配置
+│   │           ├── child_info.json    # 孩子信息识别配置
+│   │           ├── city.json          # 城市相关配置
+│   │           ├── event_utils.json   # 事件工具配置
+│   │           ├── fight_utils.json   # 战斗工具配置
+│   │           ├── main_ui.json       # 主界面配置
+│   │           ├── marry.json         # 相亲系统配置
+│   │           ├── role.json          # 角色相关配置
+│   │           └── start_up.json      # 启动配置
+│   ├── description.md        # 项目描述
+│   ├── interface.json        # 接口配置
+│   └── logo.png              # 项目 logo
+├── deps/                     # JSON Schema 定义
+│   └── tools/
+│       ├── custom.action.schema.json
+│       ├── custom.recognition.schema.json
+│       ├── interface.schema.json
+│       ├── interface_config.schema.json
+│       └── pipeline.schema.json
+├── docs/                     # 文档
+│   ├── maafw_doc/            # MAAFW 协议文档
+│   └── zh_cn/                # 中文文档
+│       ├── MaaPiCli 使用说明.md
 │       ├── panel.md         # Panel 识别系统设计
-│       └── 功能介绍.md
-└── deps/                     # JSON Schema 定义
+│       ├── 个性化配置.md
+│       ├── 功能介绍.md
+│       ├── 常见问题.md
+│       ├── 战斗系统开发文档.md
+│       ├── 新手上路.md
+│       └── 连接设置.md
+├── tools/                    # 工具脚本
+│   ├── ci/                   # CI 相关工具
+│   ├── minify_json.py        # JSON 压缩工具
+│   └── validate_schema.py    # Schema 验证工具
+├── .github/                  # GitHub 配置
+├── check_resource.py         # 资源检查脚本
+├── claude.md                 # 项目理解文档
+├── README.md                 # 项目说明
+└── requirements.txt          # 依赖包列表
 ```
 
 ## 关键概念
@@ -73,61 +113,9 @@ MAAGC/
 | 血脉面板 | 血统名称及百分比 | 动态高度计算 + OCR |
 | 特性面板 | 特性列表（带滚动）| 连续失败终止机制 |
 
-### 2. 数据结构
+### 2. 设计规范
 
-```python
-@dataclass
-class Potential:
-    """潜力属性"""
-    values: dict[str, float]  # 属性名 -> 属性值
-
-@dataclass
-class Bloodline:
-    """血脉信息"""
-    bloodlines: list[dict]    # 血统列表
-
-@dataclass
-class Feature:
-    """特性信息"""
-    features: list[str]       # 特性列表
-
-@dataclass
-class ParentInfo:
-    """父母信息"""
-    name: str
-    title: str       # 爵位
-    mercenary_group: str
-```
-
-### 3. 命名规则
-
-孩子命名格式：`最高属性 + 次高属性 + 特性 + 爵位`
-
-示例：`力 ss 技 ss 太科公`
-
-- 力: 最高属性（力量）
-- ss: 属性等级（>0.93）
-- 技: 次高属性（技巧）
-- 太: 特性（太阳）
-- 科: 特性（科内塔）
-- 公: 爵位（公爵）
-
-### 4. 爵位等级
-
-```python
-TITLE_RANK = {
-    "公爵": 4,   # 最高 → 乡村宴会
-    "伯爵": 3,
-    "男爵": 2,
-    "骑士": 1,
-    "无爵位": 0,
-}
-```
-
-### 5. 婚礼宴会选择
-
-- **公爵（等级 4）** → 乡村宴会
-- **伯爵及以下** → 祝福婚宴
+详细的数据结构、命名规则、爵位等级和婚礼宴会选择等设计规范，请参考：[设计规范](./docs/zh_cn/设计规范.md)
 
 ## 核心文件说明
 
@@ -143,6 +131,17 @@ TITLE_RANK = {
 - `extract_bloodlines()` - 提取血脉信息
 - `extract_features()` - 提取特性列表
 - `generate_child_name()` - 生成孩子名字
+
+### agent/action/zshg/daily_task.py
+
+**功能**: 每日任务处理系统
+
+**主要功能**:
+
+- 自动处理每日礼包和密令
+- 自动进入市场购买折扣物品
+- 自动进入商城领取免费礼包
+- 自动进入悬赏令界面领取奖励
 
 ### agent/action/zshg/role_utils.py
 
@@ -180,14 +179,25 @@ TITLE_RANK = {
         "timeout": 2000
     }
 }
-```
 
 **常用 Recognition 类型**:
 
 - `OCR` - 文字识别
 - `DirectHit` - 图像直击
-- `Template模板匹配
--Match` -  `ColorMatch` - 颜色匹配
+- `TemplateMatch` - 模板匹配
+- `ColorMatch` - 颜色匹配
+
+**主要配置文件**:
+
+- `auto_task.json` - 自动任务配置
+- `child_info.json` - 孩子信息识别配置
+- `city.json` - 城市相关配置
+- `event_utils.json` - 事件工具配置
+- `fight_utils.json` - 战斗工具配置
+- `main_ui.json` - 主界面配置
+- `marry.json` - 相亲系统配置
+- `role.json` - 角色相关配置
+- `start_up.json` - 启动配置
 
 ## 常用工具任务
 
@@ -207,11 +217,12 @@ TITLE_RANK = {
 
 ## 开发注意事项
 
-1. **ROI vs CropBox**: 使用 `roi` 而非 `crop_box`，更符合 MAA 标准
-2. **期望值数组**: `expected` 使用数组提高识别容错率
-3. **属性区间**: 属性区间应该是连续的，避免空隙
-4. **动态内容**: 使用锚点定位 + 相对坐标计算
-5. **滚动面板**: 连续失败 2 次时终止识别
+1. **设计规范分离**: 设计类内容（数据结构、命名规则、爵位等级等）应放在专门的子文档中，并在主文档中提供引用路径，便于快速查阅
+2. **ROI vs CropBox**: 使用 `roi` 而非 `crop_box`，更符合 MAA 标准
+3. **期望值数组**: `expected` 使用数组提高识别容错率
+4. **属性区间**: 属性区间应该是连续的，避免空隙
+5. **动态内容**: 使用锚点定位 + 相对坐标计算
+6. **滚动面板**: 连续失败 2 次时终止识别
 
 ## 常用命令
 
@@ -254,6 +265,12 @@ python check_resource.py
 
 ## 相关文档
 
+- [设计规范](./docs/zh_cn/设计规范.md) - 数据结构、命名规则、爵位等级等设计规范
 - [Panel 识别系统设计](./docs/zh_cn/panel.md)
 - [功能介绍](./docs/zh_cn/功能介绍.md)
 - [新手上路](./docs/zh_cn/新手上路.md)
+- [MaaPiCli 使用说明](./docs/zh_cn/MaaPiCli 使用说明.md)
+- [个性化配置](./docs/zh_cn/个性化配置.md)
+- [常见问题](./docs/zh_cn/常见问题.md)
+- [战斗系统开发文档](./docs/zh_cn/战斗系统开发文档.md)
+- [连接设置](./docs/zh_cn/连接设置.md)
