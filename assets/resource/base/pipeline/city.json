@@ -400,10 +400,10 @@
     "FightReusltLevelUp": {
         "recognition": "OCR",
         "roi": [
-            241,
-            201,
-            260,
-            187
+            254,
+            893,
+            192,
+            123
         ],
         "expected": [
             "等级",

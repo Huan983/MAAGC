@@ -223,6 +223,35 @@ python -m py_compile agent/action/zshg/marry.py
 python check_resource.py
 ```
 
+## 开发参考文档
+
+### MAAFW 协议文档
+
+| 文档名称 | 用途 | 路径 | 重要性 |
+|---------|------|------|--------|
+| 任务流水线协议 | 编写 JSON 格式的 node 任务 | `docs/maafw_doc/3.1-任务流水线协议.md` | **必须学习** |
+| ProjectInterfaceV2 协议 | 编写外部 interface 接口给外部 UI 使用 | `docs/maafw_doc/3.3-ProjectInterfaceV2协议.md` | **必须学习** |
+| 快速开始 | MAAFW 快速入门指南 | `docs/maafw_doc/1.1-快速开始.md` | 推荐学习 |
+| 术语解释 | MAAFW 核心术语说明 | `docs/maafw_doc/1.2-术语解释.md` | 推荐学习 |
+| 集成文档 | MAAFW 集成指南 | `docs/maafw_doc/2.1-集成文档.md` | 推荐学习 |
+| 集成接口一览 | MAAFW 接口列表 | `docs/maafw_doc/2.2-集成接口一览.md` | 推荐学习 |
+| 回调协议 | MAAFW 回调机制说明 | `docs/maafw_doc/2.3-回调协议.md` | 推荐学习 |
+| 控制方式说明 | MAAFW 控制方法详解 | `docs/maafw_doc/2.4-控制方式说明.md` | 推荐学习 |
+| ProjectInterface 协议 | 旧版项目接口协议 | `docs/maafw_doc/3.2-ProjectInterface协议.md` | 参考学习 |
+| 构建指南 | MAAFW 构建方法 | `docs/maafw_doc/4.1-构建指南.md` | 参考学习 |
+| 标准化接口设计 | 接口设计规范 | `docs/maafw_doc/4.2-标准化接口设计.md` | 参考学习 |
+| 问题反馈 | 问题提交指南 | `docs/maafw_doc/5.1-问题反馈.md` | 参考学习 |
+| NodeJS 快速开始 | NodeJS 集成指南 | `docs/maafw_doc/NodeJS/J1.1-快速开始.md` | 参考学习 |
+| NodeJS 自定义识别_操作 | NodeJS 自定义功能 | `docs/maafw_doc/NodeJS/J1.2-自定义识别_操作.md` | 参考学习 |
+| NodeJS 打包 | NodeJS 项目打包 | `docs/maafw_doc/NodeJS/J1.3-打包.md` | 参考学习 |
+
+### 重要说明
+
+**AI 助手在工作时必须学习以下两个核心文档：**
+
+1. **任务流水线协议** (`docs/maafw_doc/3.1-任务流水线协议.md`) - 编写 JSON 格式的 node 任务时的核心参考
+2. **ProjectInterfaceV2 协议** (`docs/maafw_doc/3.3-ProjectInterfaceV2协议.md`) - 编写外部 interface 接口给外部 UI 使用时的核心参考
+
 ## 相关文档
 
 - [Panel 识别系统设计](./docs/zh_cn/panel.md)

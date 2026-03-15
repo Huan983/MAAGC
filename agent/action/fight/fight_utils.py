@@ -153,7 +153,7 @@ def _accept_new_task(context: Context) -> bool:
     Returns:
         bool: 接取成功返回 True
     """
-    max_swipe_times = 3
+    max_swipe_times = 5
     swipe_count = 0
 
     while swipe_count <= max_swipe_times:
@@ -187,7 +187,17 @@ def _accept_new_task(context: Context) -> bool:
                     accept_task_rect_x, accept_task_rect_y
                 ).wait()
                 time.sleep(0.5)
-            return True
+                return True
+            else:
+                if swipe_count < max_swipe_times:
+                    logger.info(
+                        f"找到任务但未找到接受按钮，正在滑动刷新... ({swipe_count + 1}/{max_swipe_times})"
+                    )
+                    context.run_task("FindCityTask_SwipeDown")
+                    swipe_count += 1
+                else:
+                    logger.error("已尝试多次刷新，未检测到可接取的任务的接受按钮")
+                    return False
         else:
             if swipe_count < max_swipe_times:
                 logger.info(

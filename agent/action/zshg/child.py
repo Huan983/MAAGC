@@ -246,9 +246,14 @@ class ChildRec(CustomAction):
         if not child_index.hit:
             logger.error("识别第几个出生的孩子失败")
             return CustomAction.RunResult(success=False)
-        child_index = int(
-            child_index.text.strip().replace("第", "").replace("个孩子", "")
-        )
+
+        # 提取数字（使用正则表达式）
+        ocr_text = child_index.best_result.text.strip()
+        match = re.search(r"第(\d+)个孩子", ocr_text)
+        if not match:
+            logger.error(f"无法从识别结果中提取数字：{ocr_text}")
+            return CustomAction.RunResult(success=False)
+        child_index = int(match.group(1))
         logger.info(f"是第{child_index}个出生")
 
         # 2. 提取天赋属性、血脉、特性（完整识别流程）

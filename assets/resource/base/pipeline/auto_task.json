@@ -57,5 +57,12 @@
         "custom_action": "WeddingProcessor",
         "post_delay": 500,
         "timeout": 3000
+    },
+    "Auto_DailyTask": {
+        "recognition": "DirectHit",
+        "action": "Custom",
+        "custom_action": "DailyTaskProcessor",
+        "post_delay": 500,
+        "timeout": 3000
     }
 }
