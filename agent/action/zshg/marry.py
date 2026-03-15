@@ -40,19 +40,24 @@ class MarryProcessor(CustomAction):
         """
         try:
             # 获取项目根目录
-            # marry.py 路径：agent/action/zshg/marry.py
-            # 需要向上 3 级到 agent，再向上 1 级到项目根目录
             project_root = Path(__file__).parent.parent.parent.parent
             names_file = project_root / "assets" / "assets" / "high_blood_names.json"
 
             with open(names_file, "r", encoding="utf-8") as f:
-                self.blood_names = json.load(f)
+                raw_data = json.load(f)
 
-            logger.info(f"成功加载 {len(self.blood_names)} 个国家的姓名表")
-            for country, genders in self.blood_names.items():
-                male_count = len(genders.get("男", []))
-                female_count = len(genders.get("女", []))
-                logger.debug(f"  - {country}: 男{male_count}人，女{female_count}人")
+            # 简化结构：直接用种族名作为 key，value 是该种族所有名字的列表
+            self.blood_names = {}
+            for race, genders in raw_data.items():
+                all_names = []
+                for gender_names in genders.values():
+                    all_names.extend(gender_names)
+                self.blood_names[race] = all_names
+
+            logger.info(f"成功加载 {len(self.blood_names)} 个种族的姓名表")
+            for race, names in self.blood_names.items():
+                logger.debug(f"  - {race}: 共{len(names)}个名字")
+                logger.info(f"  - {race}: {names}")
         except Exception as e:
             logger.error(f"加载姓名表失败：{e}")
             self.blood_names = {}
@@ -154,19 +159,22 @@ class MarryProcessor(CustomAction):
         img = context.tasker.controller.post_screencap().wait().get()
         for row_idx, row_boxes in enumerate(self.all_boxes):
             for col_idx, box in enumerate(row_boxes):
-                MarryingRecoResult = context.run_recognition(
+                if context.run_recognition(
                     "CastleMarryingCheck",
                     img,
                     pipeline_override={"CastleMarryingCheck": {"roi": box}},
-                )
-                TitileRecoResult = context.run_recognition(
+                ).hit:
+                    continue
+
+                if context.run_recognition(
                     "CastleMarryTitleCheck",
                     img,
                     pipeline_override={"CastleMarryTitleCheck": {"roi": box}},
-                )
-                if not MarryingRecoResult.hit and TitileRecoResult.hit:
+                ).hit:
                     available_boxes.append((row_idx, col_idx, box))
-                    logger.info(f"发现可相亲对象：第{row_idx + 1}行第{col_idx + 1}列")
+                    logger.info(
+                        f"发现可相亲对象：第{row_idx + 1}行第{col_idx + 1}列， box为{box}"
+                    )
 
         # 记录可用的相亲对象数量
         logger.info(f"可相亲队列大小：{len(available_boxes)}")
@@ -174,13 +182,21 @@ class MarryProcessor(CustomAction):
         # 3. 进行相亲 ing
         # 循环条件：available_boxes 归零 or ObjectsCount 归零时，停止相亲
         for row_idx, col_idx, box in available_boxes:
-            logger.info(f"开始处理第{row_idx + 1}行第{col_idx + 1}列的相亲对象")
+            if context.tasker.stopping:
+                logger.info("相亲任务已停止")
+                return CustomAction.RunResult(success=False)
+
             roleBoxCenter = box[0] + box[2] // 2, box[1] + box[3] // 2
-            # 3.1 每个相亲对象，长按点击进入角色详情
-            # TODO: 实现长按点击进入详情的逻辑
+            logger.info(
+                f"开始处理第{row_idx + 1}行第{col_idx + 1}列的相亲对象， boxCenter为{roleBoxCenter}"
+            )
+            # 3.1 每个相亲对象，单机选中角色，长按进入角色详情
+            context.tasker.controller.post_click(
+                roleBoxCenter[0], roleBoxCenter[1]
+            ).wait()
             context.run_task(
                 "LongPressRole",
-                pipeline_override={"LongPressRole": {"roi": roleBoxCenter}},
+                pipeline_override={"LongPressRole": {"target": roleBoxCenter}},
             )
 
             # 3.1. 确定是男还是女
@@ -194,18 +210,23 @@ class MarryProcessor(CustomAction):
                 gender = "男"
             logger.info(f"识别性别：{gender}")
 
-            # 3.2. 查看该苗子的潜力、血脉、特性面板，检查橙特：例如太阳、科内塔、上自专等（后续开发）
+            # 3.2. 先进入血统面板，查看该苗子的潜力、血脉、特性面板，检查橙特：例如太阳、科内塔、上自专等（后续开发）
+            context.run_task("RolePanel_BloodPage")
             potential, bloodline, features = extract_all_role_info(context)
 
             highest_bloodline = get_highest_bloodline(bloodline)
             logger.info(f"最高血统：{highest_bloodline}")
 
-            # 3.3. 根据血统确定联姻国家
+            # 3.3. 根据血统确定联姻国家和种族
             target_country = self._get_marriage_country(highest_bloodline)
-            logger.info(f"联姻国家：{target_country}")
+            target_race = highest_bloodline  # 最高血统即为种族，用于匹配姓名表
+            logger.info(f"联姻国家：{target_country}，联姻种族：{target_race}")
+            if not target_country:
+                logger.warning(f"未识别到联姻国家")
+                continue
 
             # 4. 确定信息后，进入正式相亲页面，正式相亲
-            # 点击进入相亲流程
+            context.run_task("BackButton_500ms")
             context.run_task(
                 "CastleMarrySelectStart",
                 pipeline_override={
@@ -220,14 +241,11 @@ class MarryProcessor(CustomAction):
             for attempt in range(max_attempts):
                 logger.info(f"第 {attempt + 1}/{max_attempts} 次尝试匹配姓名")
 
-                # 4.1.1 根据性别选择目标性别名单（相亲对象是女，目标对象则是男，反之亦然）
-                target_gender = "男" if gender == "女" else "女"
-                target_names = self.blood_names.get(target_country, {}).get(
-                    target_gender, []
-                )
+                # 4.1.1 直接判断该种族里有没有这个名字
+                target_names = self.blood_names.get(target_race, [])
 
                 if not target_names:
-                    logger.warning(f"{target_country} 的 {target_gender} 性姓名表为空")
+                    logger.warning(f"{target_race} 的姓名表为空")
                     break
 
                 # 4.1.2 点击"就这个"按钮，触发姓名识别
@@ -247,8 +265,8 @@ class MarryProcessor(CustomAction):
                 ocr_text = reco_result.best_result.text
                 logger.info(f"识别到的姓名：{ocr_text}")
 
-                # 4.1.5 使用正则提取姓名（格式：确认向 XXX 发送）
-                name_match = re.search(r"确认向 ([\u4e00-\u9fa5]{1,5}) 发送", ocr_text)
+                # 4.1.5 使用正则提取姓名（格式：确认向 XXX 发送...）
+                name_match = re.search(r"向([\u4e00-\u9fa5]{1,5})发送", ocr_text)
                 if not name_match:
                     logger.warning(
                         f"无法从 OCR 结果中提取姓名：{ocr_text}, 请检查是否显示了姓名"
@@ -261,24 +279,25 @@ class MarryProcessor(CustomAction):
                 # 4.1.6 判断姓名是否在高血名单中
                 if detected_name in target_names:
                     logger.info(
-                        f"姓名匹配成功：{detected_name} 在 {target_country} 的{target_gender}性高血名单中"
+                        f"姓名匹配成功：{detected_name} 在 {target_race} 的高血名单中"
                     )
                     match_found = True
                     # 点击"确定"确认相亲
-                    # context.run_task("CastleMarryPopConfirmButton")
+                    context.run_task("PopUpWindowConfirm")
                     break
                 else:
                     logger.info(
                         f"姓名不匹配：{detected_name} 不在高血名单中，尝试下一个"
                     )
                     # 取消匹配，点击"下一位"继续
-                    context.run_task("CastleMarryPopCancelButton")
+                    context.run_task("PopUpWindowCancel")
                     context.run_task("CastleMarryNextOneButton")
 
             if not match_found:
                 logger.warning(f"经过{max_attempts}次尝试，仍未找到匹配的姓名")
                 # 点击"取消"退出
-                context.run_task("CastleMarryPopCancelButton")
+                context.run_task("PopUpWindowCancel")
+                context.run_task("CastleMarryLeave")
 
             logger.info(f"完成第{row_idx + 1}行第{col_idx + 1}列的处理")
 
