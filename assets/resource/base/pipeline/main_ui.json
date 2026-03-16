@@ -527,6 +527,25 @@
         "expected": [
             "提示"
         ],
+        "next": [
+            "PopUpWindowsTipConfirm"
+        ],
+        "timeout": 2000
+    },
+    "PopUpWindowsTipConfirm": {
+        "recognition": "OCR",
+        "roi": [
+            175,
+            646,
+            436,
+            148
+        ],
+        "expected": [
+            "确定"
+        ],
+        "action": "Click",
+        "target": true,
+        "post_delay": 500,
         "timeout": 2000
     },
     "PopUpWindowConfirm": {

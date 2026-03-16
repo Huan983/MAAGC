@@ -44,6 +44,10 @@ def detect_and_manage_event(context: Context, screenshot) -> str:
         logger.info("检测到告白失败事件")
         context.run_task("Event_ConfessionFailGiveUp")
         return "confession_fail"
+    elif context.run_recognition("PopUpWindowTip", screenshot).hit:
+        logger.info("检测到提示事件")
+        context.run_task("PopUpWindowTip")
+        return "PopUpWindowTip"
     else:
         return None
 
@@ -77,8 +81,8 @@ def handle_festival_by_month(context: Context, month: int) -> bool:
         logger.info("本月：启航节")
         return handle_sailing_festival(context)
     elif month == 5:
-        logger.info("本月：春林节，跳过")
-        return True
+        logger.info("本月：春林节，执行相亲")
+        return handle_marry_festival(context)
     elif month == 6:
         logger.info("本月：铸魂节，跳过")
         return True
@@ -157,6 +161,21 @@ def handle_sailing_festival(context: Context) -> bool:
         logger.info("没有商品")
 
     context.run_task("UI_ReturnBigMap")
+    return True
+
+
+def handle_marry_festival(context: Context) -> bool:
+    """处理春林节相亲（5月）"""
+    logger.info("处理春林节相亲")
+
+    # 执行相亲处理器自定义动作
+    context.run_task("Auto_MarryTask")
+
+    # 返回大地图
+    if not fight_utils.ensure_at_bigmap(context):
+        logger.error("无法回到大地图界面")
+        return False
+
     return True
 
 

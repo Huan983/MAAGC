@@ -1,0 +1,67 @@
+{
+  "conditions": [
+    {
+      "id": "koneita",
+      "name": "科内塔之怒组合",
+      "description": "技巧SS + 力量S + 意志或敏捷有一个0.3以上 + 科内塔之怒",
+      "enabled": true,
+      "potential": {
+        "技巧": {
+          "grade": "SS",
+          "min_value": null
+        },
+        "力量": {
+          "grade": "S",
+          "min_value": null
+        },
+        "or_attributes": [
+          {
+            "意志": {
+              "min_value": 0.3
+            }
+          },
+          {
+            "敏捷": {
+              "min_value": 0.3
+            }
+          }
+        ]
+      },
+      "features": [
+        "科内塔之怒"
+      ]
+    },
+    {
+      "id": "sun_and_koneita",
+      "name": "太阳+科内塔组合",
+      "description": "技巧SS + 力量S + 意志或敏捷有一个0.3以上 + 太阳之子 + 科内塔之怒",
+      "enabled": true,
+      "potential": {
+        "技巧": {
+          "grade": "SS",
+          "min_value": null
+        },
+        "力量": {
+          "grade": "S",
+          "min_value": null
+        },
+        "or_attributes": [
+          {
+            "意志": {
+              "min_value": 0.3
+            }
+          },
+          {
+            "敏捷": {
+              "min_value": 0.3
+            }
+          }
+        ]
+      },
+      "features": [
+        "科内塔之怒",
+        "太阳之子"
+      ]
+    }
+  ]
+}

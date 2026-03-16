@@ -32,6 +32,128 @@ ATTRIBUTE_RANK = {
     "E": 1,
 }
 
+# 好苗子条件配置
+CHILD_ALERT_CONDITIONS = None
+
+
+def load_child_alert_conditions():
+    """加载好苗子条件配置"""
+    global CHILD_ALERT_CONDITIONS
+    if CHILD_ALERT_CONDITIONS is None:
+        try:
+            project_root = os.path.dirname(
+                os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+            )
+            config_file = os.path.join(
+                project_root, "assets", "table", "child_alert_conditions.json"
+            )
+
+            if os.path.exists(config_file):
+                with open(config_file, "r", encoding="utf-8") as f:
+                    CHILD_ALERT_CONDITIONS = json.load(f)
+                logger.info(
+                    f"好苗子条件配置加载成功，共 {len(CHILD_ALERT_CONDITIONS.get('conditions', []))} 个条件"
+                )
+            else:
+                logger.warning(f"好苗子条件配置文件不存在: {config_file}")
+                CHILD_ALERT_CONDITIONS = {"conditions": []}
+        except Exception as e:
+            logger.error(f"加载好苗子条件配置失败: {e}")
+            CHILD_ALERT_CONDITIONS = {"conditions": []}
+
+    return CHILD_ALERT_CONDITIONS
+
+
+def check_potential_condition(potential_values: dict, condition: dict) -> tuple:
+    """
+    检查潜力属性是否满足指定条件
+    Args:
+        potential_values: 潜力属性字典 {"技巧": 0.9, "力量": 0.8, ...}
+        condition: 条件配置字典
+    Returns:
+        (是否满足条件, 满足的属性信息)
+    """
+    potential_config = condition.get("potential", {})
+    if not potential_config:
+        return True, {}
+
+    # 检查必需的属性
+    required_attrs = {}
+    or_attributes = None
+
+    for attr_name, attr_requirement in potential_config.items():
+        if attr_name == "or_attributes":
+            or_attributes = attr_requirement
+            continue
+        grade = attr_requirement.get("grade")
+        min_value = attr_requirement.get("min_value")
+
+        current_value = potential_values.get(attr_name, 0)
+        current_grade = get_potential_grade(current_value)
+
+        # 检查等级
+        if grade:
+            grade_rank = ATTRIBUTE_RANK.get(grade, 0)
+            current_rank = ATTRIBUTE_RANK.get(current_grade, 0)
+            if current_rank < grade_rank:
+                return False, {}
+
+        # 检查最小值
+        if min_value is not None and current_value < min_value:
+            return False, {}
+
+        required_attrs[attr_name] = (current_value, current_grade)
+
+    # 检查or_attributes条件
+    if or_attributes:
+        or_satisfied = False
+        for or_group in or_attributes:
+            group_satisfied = True
+            for attr_name, attr_requirement in or_group.items():
+                min_value = attr_requirement.get("min_value")
+                current_value = potential_values.get(attr_name, 0)
+
+                if min_value is not None and current_value < min_value:
+                    group_satisfied = False
+                    break
+                else:
+                    current_grade = get_potential_grade(current_value)
+                    required_attrs[attr_name] = (current_value, current_grade)
+
+            if group_satisfied:
+                or_satisfied = True
+                break
+
+        if not or_satisfied:
+            return False, {}
+
+    return True, required_attrs
+
+
+def check_feature_condition(features: list, condition: dict) -> tuple:
+    """
+    检查特性是否满足指定条件
+    Args:
+        features: Feature对象列表
+        condition: 条件配置字典
+    Returns:
+        (是否满足条件, 满足的特性列表)
+    """
+    feature_config = condition.get("features", [])
+    if not feature_config:
+        return True, []
+
+    feature_names = [f.name for f in features]
+    found_features = []
+
+    for required_feature in feature_config:
+        for feature_name in feature_names:
+            if required_feature in feature_name:
+                found_features.append(feature_name)
+                break
+
+    return len(found_features) >= len(feature_config), found_features
+
 
 def generate_child_name(
     potential,
@@ -94,18 +216,92 @@ def generate_child_name(
 
 def evaluate_potential(potential) -> tuple:
     """
-    评估潜力属性，计算S及以上等级的属性个数
+    评估潜力属性，判断是否满足好苗子条件
+    条件：技巧SS + 力量S + 意志或敏捷有一个0.3以上
     Args:
         potential: Potential 对象
     Returns:
-        (是否为好苗子, S及以上属性个数)
+        (是否为好苗子, 属性详情信息)
     """
-    s_count = 0
-    for attr_value in potential.values.values():
-        grade = get_potential_grade(attr_value)
-        if grade in ["S", "SS"]:
-            s_count += 1
-    return s_count >= 3, s_count
+    values = potential.values
+
+    ji_qiao = values.get("技巧", 0)
+    li_liang = values.get("力量", 0)
+    yi_zhi = values.get("意志", 0)
+    min_jie = values.get("敏捷", 0)
+
+    ji_qiao_grade = get_potential_grade(ji_qiao)
+    li_liang_grade = get_potential_grade(li_liang)
+    yi_zhi_grade = get_potential_grade(yi_zhi)
+    min_jie_grade = get_potential_grade(min_jie)
+
+    # 检查是否满足条件：技巧SS + 力量S + 意志或敏捷有一个0.3以上
+    is_good = (
+        ji_qiao_grade == "SS"
+        and li_liang_grade == "S"
+        and (yi_zhi >= 0.3 or min_jie >= 0.3)
+    )
+
+    detail_info = {
+        "技巧": (ji_qiao, ji_qiao_grade),
+        "力量": (li_liang, li_liang_grade),
+        "意志": (yi_zhi, yi_zhi_grade),
+        "敏捷": (min_jie, min_jie_grade),
+    }
+
+    return is_good, detail_info
+
+
+def evaluate_with_config(potential, features) -> tuple:
+    """
+    根据配置文件评估是否为好苗子
+    支持多种条件配置，满足任一条件即触发提醒
+    Args:
+        potential: Potential 对象
+        features: Feature 对象列表
+    Returns:
+        (是否为好苗子, 满足的条件信息, 匹配到的条件名称)
+    """
+    config = load_child_alert_conditions()
+    conditions = config.get("conditions", [])
+
+    potential_values = potential.values
+
+    for condition in conditions:
+        # 检查条件是否启用
+        if not condition.get("enabled", True):
+            continue
+
+        condition_id = condition.get("id", "unknown")
+        condition_name = condition.get("name", condition_id)
+
+        # 检查潜力条件
+        potential_ok, potential_detail = check_potential_condition(
+            potential_values, condition
+        )
+
+        # 检查特性条件
+        feature_ok, found_features = check_feature_condition(features, condition)
+
+        # 同时满足潜力和特性条件
+        if potential_ok and feature_ok:
+            # 构建匹配的属性信息
+            detail_info = {}
+            for attr_name, (attr_value, grade) in potential_detail.items():
+                detail_info[attr_name] = (attr_value, grade)
+
+            logger.info(f"好苗子条件匹配成功: {condition_name}")
+            return (
+                True,
+                {
+                    "potential": detail_info,
+                    "features": found_features,
+                    "condition_name": condition_name,
+                },
+                condition_name,
+            )
+
+    return False, {}, ""
 
 
 def load_good_features() -> list:
@@ -140,22 +336,29 @@ def load_good_features() -> list:
 
 def evaluate_features(features: list, good_features: list) -> tuple:
     """
-    评估特性，检查是否存在好特性
+    评估特性，专门检查"科内塔之怒"特性
     Args:
         features: Feature 对象列表
-        good_features: 好特性列表
+        good_features: 好特性列表（此参数保留但不强制要求）
     Returns:
-        (是否为好苗子, 好特性列表)
+        (是否有科内塔之怒, 找到的特性列表)
     """
     found_good_features = []
 
+    # 专门检查科内塔之怒
+    koneita_zhi_nu = "科内塔之怒"
+
     for feature in features:
         feature_name = feature.name
-        # 检查是否包含好特性（考虑OCR识别误差）
-        for good_feature in good_features:
-            if good_feature in feature_name:
-                found_good_features.append(feature_name)
-                break
+        # 检查是否包含科内塔之怒（考虑OCR识别误差）
+        if koneita_zhi_nu in feature_name:
+            found_good_features.append(feature_name)
+        # 也检查其他好特性（可选）
+        else:
+            for good_feature in good_features:
+                if good_feature in feature_name and good_feature != koneita_zhi_nu:
+                    found_good_features.append(feature_name)
+                    break
 
     return len(found_good_features) > 0, found_good_features
 
@@ -187,7 +390,7 @@ class ChildRec(CustomAction):
     识别子项信息
     """
 
-    def __init__(self, child_alert_enabled: bool = False) -> None:
+    def __init__(self, child_alert_enabled: bool = True) -> None:
         """
         Args:
             child_alert_enabled: 是否启用好苗子提醒功能，默认关闭
@@ -354,21 +557,31 @@ class ChildRec(CustomAction):
         )
         logger.info(f"子孙命名：{child_name}")
 
-        # 6. 评估是否为好苗子
-        is_good_potential, s_count = evaluate_potential(self.potential)
-        is_good_feature, good_feature_list = evaluate_features(
-            self.features, self.good_features
+        # 6. 评估是否为好苗子（使用配置文件）
+        is_good, match_info, condition_name = evaluate_with_config(
+            self.potential, self.features
         )
 
         # 7. 如果是好苗子，根据开关决定是否弹出弹窗
-        if (is_good_potential or is_good_feature) and self.child_alert_enabled:
+        if is_good and self.child_alert_enabled:
+            potential_detail = match_info.get("potential", {})
+            good_feature_list = match_info.get("features", [])
+
+            # 计算S及以上属性个数
+            s_count = sum(
+                1 for val, grade in potential_detail.values() if grade in ["S", "SS"]
+            )
+
             # 构建弹窗内容
             alert_content = f"🎉 发现好苗子！\n\n"
 
+            # 显示匹配的条件名称
+            if condition_name:
+                alert_content += f"【匹配条件】{condition_name}\n\n"
+
             # 潜力信息
             alert_content += "【潜力属性】\n"
-            for attr_name, attr_value in self.potential.values.items():
-                grade = get_potential_grade(attr_value)
+            for attr_name, (attr_value, grade) in potential_detail.items():
                 alert_content += f"{attr_name}: {grade} ({attr_value:.4f})\n"
             alert_content += f"\nS及以上属性个数: {s_count}\n"
 
@@ -400,17 +613,25 @@ class ChildRec(CustomAction):
                 pipeline_override={"Node.Action.Succeeded": {"content": alert_content}},
             )
             logger.info("弹出好苗子弹窗，等待用户手动命名")
+            context.tasker.post_stop()
 
             # 等待用户手动命名（暂停执行）
             # 这里不自动输入名字，让用户自己命名
         else:
             # 普通苗子或关闭提醒功能，自动输入命名
-            if is_good_potential or is_good_feature:
+            if is_good:
                 # 记录好苗子信息但不弹出弹窗
                 logger.info(f"🎉 发现好苗子（提醒功能已关闭）")
-                logger.info(f"  潜力: S及以上属性{s_count}个")
-                if good_feature_list:
-                    logger.info(f"  特性: {', '.join(good_feature_list)}")
+                logger.info(f"  匹配条件: {condition_name}")
+                if match_info.get("potential"):
+                    s_count = sum(
+                        1
+                        for val, grade in match_info["potential"].values()
+                        if grade in ["S", "SS"]
+                    )
+                    logger.info(f"  潜力: S及以上属性{s_count}个")
+                if match_info.get("features"):
+                    logger.info(f"  特性: {', '.join(match_info['features'])}")
                 logger.info(f"  推荐命名: {child_name}")
 
             context.run_task("BackButton_500ms")

@@ -156,6 +156,9 @@ def _accept_new_task(context: Context) -> bool:
     max_swipe_times = 5
     swipe_count = 0
 
+    # 使用单例模式的TaskExtractor，不会重复初始化
+    extractor = TaskExtractor(roi=[15, 382, 697, 841])
+
     while swipe_count <= max_swipe_times:
         reco_detail = context.run_recognition(
             "GetCityTaskDetails",
@@ -171,7 +174,6 @@ def _accept_new_task(context: Context) -> bool:
 
         tasks = []
         if reco_detail.hit:
-            extractor = TaskExtractor(roi=[15, 382, 697, 841])
             tasks = extractor.extract_tasks(reco_detail.all_results)
 
         if tasks:
@@ -248,6 +250,7 @@ def _process_fight(context: Context) -> bool:
     context.run_task("FightStart")
     round_count = 0
     max_round_warning = 20
+    max_round_stop = 30
     while True:
         img = context.tasker.controller.post_screencap().wait().get()
         if context.tasker.stopping:
@@ -260,6 +263,11 @@ def _process_fight(context: Context) -> bool:
         if context.run_recognition("FightVictory", img).hit:
             context.run_task("FightVictory")
             logger.info(f"\n战斗胜利（{round_count}回合）")
+            break
+
+        if round_count >= max_round_stop:
+            logger.error(f"⚠️ 战斗已进行 {round_count} 回合，超过上限，强制停止任务")
+            context.tasker.post_stop()
             break
 
         if round_count >= max_round_warning:

@@ -19,13 +19,27 @@ class TaskInfo:
 
 
 class TaskExtractor:
+    # 类变量，用于单例模式
+    _instance = None
+    _initialized = False
+    
     # 类变量，用于缓存数据，避免重复加载
     _task_blacklist_cache = None
     _task_blacklist_file_cache = None
     _task_names_cache = None
     _task_names_file_cache = None
 
+    def __new__(cls, roi: List[int] = None):
+        # 单例模式实现
+        if cls._instance is None:
+            cls._instance = super(TaskExtractor, cls).__new__(cls)
+        return cls._instance
+
     def __init__(self, roi: List[int] = None):
+        # 防止重复初始化
+        if self._initialized:
+            return
+        self._initialized = True
         self.roi = roi or [0, 0, 1920, 1080]
         self.roi_rect = Rect(*self.roi)
         self.accept_buttons = []
