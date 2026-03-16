@@ -457,7 +457,6 @@ class WeddingProcessor(CustomAction):
             },
         )
         context.run_task("PopUpWindowConfirm")
-        context.run_task("UI_ReturnBigMap")
         return CustomAction.RunResult(success=True)
 
     def _compare_titles(self, left_title: str, right_title: str) -> str:
