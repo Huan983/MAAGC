@@ -3,8 +3,8 @@
         "next": [
             "GameMainWindow",
             "[JumpBack]GameLoading",
-            "[JumpBack]GameEnterGame",
             "[JumpBack]GameClickInform",
+            "[JumpBack]GameEnterGame",
             "[JumpBack]AppStartUp"
         ]
     },
