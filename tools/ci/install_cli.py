@@ -69,6 +69,11 @@ def install_resource():
         install_path / "resource",
         dirs_exist_ok=True,
     )
+    shutil.copytree(
+        working_dir / "assets" / "table",
+        install_path / "table",
+        dirs_exist_ok=True,
+    )
     with open(working_dir / "assets" / "interface.json", "r", encoding="utf-8") as f:
         interface = json.load(f)
 
@@ -99,12 +104,12 @@ def install_chores():
             working_dir / file,
             install_path,
         )
-    # shutil.copytree(
-    #     working_dir / "docs",
-    #     install_path / "docs",
-    #     dirs_exist_ok=True,
-    #     ignore=shutil.ignore_patterns("*.yaml"),
-    # )
+    shutil.copytree(
+        working_dir / "docs",
+        install_path / "docs",
+        dirs_exist_ok=True,
+        ignore=shutil.ignore_patterns("*.yaml"),
+    )
 
 
 def install_agent():

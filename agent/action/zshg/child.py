@@ -309,11 +309,11 @@ def load_good_features() -> list:
     加载好特性列表
     Returns:
         好特性列表
+        从 cwd_dir/table/good_features.json 读取
     """
-    # 配置文件路径
+    # 配置文件路径 - 使用当前工作目录作为基础路径
     config_path = os.path.join(
-        os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))),
-        "assets",
+        os.getcwd(),
         "table",
         "good_features.json",
     )
@@ -327,7 +327,7 @@ def load_good_features() -> list:
             )
             return good_features
     except Exception as e:
-        logger.error(f"读取好特性配置文件失败: {e}")
+        logger.error(f"从 {config_path} 读取好特性配置文件失败: {e}")
         # 返回默认好特性列表
         default_features = ["太阳之子", "科内塔之怒"]
         logger.info(f"使用默认好特性列表: {default_features}")

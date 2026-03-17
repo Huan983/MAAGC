@@ -22,7 +22,7 @@ class TaskExtractor:
     # 类变量，用于单例模式
     _instance = None
     _initialized = False
-    
+
     # 类变量，用于缓存数据，避免重复加载
     _task_blacklist_cache = None
     _task_blacklist_file_cache = None
@@ -43,21 +43,15 @@ class TaskExtractor:
         self.roi = roi or [0, 0, 1920, 1080]
         self.roi_rect = Rect(*self.roi)
         self.accept_buttons = []
-        # 使用绝对路径
-        project_root = os.path.dirname(
-            os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
-        )
-        self.task_names_file = os.path.join(
-            project_root, "assets", "table", "task_names.json"
-        )
-        logger.info(f"TaskExtractor初始化，项目根目录: {project_root}")
+        # 使用当前工作目录作为基础路径
+        cwd_dir = os.getcwd()
+        self.task_names_file = os.path.join(cwd_dir, "table", "task_names.json")
+        logger.info(f"TaskExtractor初始化，当前工作目录: {cwd_dir}")
         logger.info(f"任务名称文件路径: {self.task_names_file}")
 
         # 使用缓存的类变量，避免重复加载
         self.known_task_names = self._get_cached_task_names()
-        self.task_blacklist_file = os.path.join(
-            project_root, "assets", "table", "task_blacklist.json"
-        )
+        self.task_blacklist_file = os.path.join(cwd_dir, "table", "task_blacklist.json")
         logger.info(f"黑名单文件路径: {self.task_blacklist_file}")
 
         # 使用缓存的类变量，避免重复加载

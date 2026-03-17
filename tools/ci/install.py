@@ -62,6 +62,11 @@ def install_resource():
         install_path / "resource",
         dirs_exist_ok=True,
     )
+    shutil.copytree(
+        working_dir / "assets" / "table",
+        install_path / "table",
+        dirs_exist_ok=True,
+    )
     shutil.copy2(
         working_dir / "assets" / "interface.json",
         install_path,
@@ -71,7 +76,7 @@ def install_resource():
         interface = json.load(f)
 
     interface["version"] = version
-    interface["title"] = f"MaaGC {version} | 亿韭韭韭小助手"
+    interface["title"] = f"MaaGC {version} | 百年骑士团小助手"
 
     with open(install_path / "interface.json", "w", encoding="utf-8") as f:
         json.dump(interface, f, ensure_ascii=False, indent=4)
@@ -83,12 +88,12 @@ def install_chores():
             working_dir / file,
             install_path,
         )
-    # shutil.copytree(
-    #     working_dir / "docs",
-    #     install_path / "docs",
-    #     dirs_exist_ok=True,
-    #     ignore=shutil.ignore_patterns("*.yaml"),
-    # )
+    shutil.copytree(
+        working_dir / "docs",
+        install_path / "docs",
+        dirs_exist_ok=True,
+        ignore=shutil.ignore_patterns("*.yaml"),
+    )
 
 
 def install_agent():
