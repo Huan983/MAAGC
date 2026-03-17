@@ -168,6 +168,12 @@ def handle_marry_festival(context: Context) -> bool:
     """处理春林节相亲（5月）"""
     logger.info("处理春林节相亲")
 
+    # 检查是否开启了自动相亲
+    EnableMarryTask = context.get_node_data("Flag_EnableMarryTask").get("enabled")
+    if not EnableMarryTask:
+        logger.info("自动相亲已关闭，跳过")
+        return True
+
     # 执行相亲处理器自定义动作
     context.run_task("Auto_MarryTask")
 
