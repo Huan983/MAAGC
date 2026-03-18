@@ -74,5 +74,31 @@
             "女"
         ],
         "timeout": 2000
+    },
+    "RolePanel_AgeCheck": {
+        "recognition": "OCR",
+        "roi": [
+            427,
+            255,
+            127,
+            59
+        ],
+        "expected": [
+            "[0-9]"
+        ],
+        "timeout": 2000
+    },
+    "RolePanel_LevelCheck": {
+        "recognition": "OCR",
+        "roi": [
+            432,
+            303,
+            122,
+            65
+        ],
+        "expected": [
+            "[0-9]"
+        ],
+        "timeout": 2000
     }
 }

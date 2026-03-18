@@ -199,16 +199,12 @@ class MarryProcessor(CustomAction):
                 pipeline_override={"LongPressRole": {"target": roleBoxCenter}},
             )
 
-            # 3.1. 确定是男还是女
-            gender = ""
-            if context.run_recognition(
-                "RolePanel_GirlCheck",
-                context.tasker.controller.post_screencap().wait().get(),
-            ).hit:
-                gender = "女"
-            else:
-                gender = "男"
-            logger.info(f"识别性别：{gender}")
+            # 3.1. 检查年龄, 大于等于45岁就不考虑了
+            age = extract_potential(context, "Age")
+            logger.info(f"识别年龄：{age}")
+            if age and int(age) >= 45:
+                logger.info(f"年龄 {age} 大于等于45岁，不考虑")
+                continue
 
             # 3.2. 先进入血统面板，查看该苗子的潜力、血脉、特性面板，检查橙特：例如太阳、科内塔、上自专等（后续开发）
             context.run_task("RolePanel_BloodPage")
@@ -264,9 +260,6 @@ class MarryProcessor(CustomAction):
 
                 # 4.1.4 提取识别到的姓名
                 ocr_text = reco_result.best_result.text
-                logger.info(f"识别到的姓名：{ocr_text}")
-
-                # 4.1.5 使用正则提取姓名（格式：确认向 XXX 发送...）
                 name_match = re.search(r"向([\u4e00-\u9fa5]{1,5})发送", ocr_text)
                 if not name_match:
                     logger.warning(
@@ -290,9 +283,11 @@ class MarryProcessor(CustomAction):
                     logger.info(
                         f"姓名不匹配：{detected_name} 不在高血名单中，尝试下一个"
                     )
-                    # 取消匹配，点击"下一位"继续
+                    # 取消匹配
                     context.run_task("PopUpWindowCancel")
-                    context.run_task("CastleMarryNextOneButton")
+                    # 只有在不是最后一次尝试时，才点击"下一位"
+                    if attempt < max_attempts - 1:
+                        context.run_task("CastleMarryNextOneButton")
 
             if not match_found:
                 logger.warning(f"经过{max_attempts}次尝试，仍未找到匹配的姓名")
