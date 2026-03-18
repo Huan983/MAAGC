@@ -458,6 +458,9 @@ class WeddingProcessor(CustomAction):
             },
         )
         context.run_task("PopUpWindowConfirm")
+        # 3.1 确认婚礼 点击四次
+        for _ in range(4):
+            context.run_task("ClickCenter_500ms")
         return CustomAction.RunResult(success=True)
 
     def _compare_titles(self, left_title: str, right_title: str) -> str:
