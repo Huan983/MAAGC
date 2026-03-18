@@ -453,7 +453,8 @@ class WeddingProcessor(CustomAction):
             },
         )
         context.run_task("PopUpWindowConfirm")
-        # 3.1 确认婚礼 点击四次
+        # 3.1 确认婚礼 点击四次确认
+        time.sleep(2)
         for _ in range(4):
             context.run_task("ClickCenter_500ms")
         return CustomAction.RunResult(success=True)
