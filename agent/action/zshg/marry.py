@@ -31,6 +31,23 @@ class MarryProcessor(CustomAction):
         super().__init__()
         self.all_boxes = []
         self.blood_names = {}  # 存储各国姓名表 {国家名：{男：[...], 女：[...]}}
+        self.race_country_mapping = {
+            "祖扎尔达王族": "加尔提斯商会",
+            "瓦诺遗族": "加尔提斯商会",
+            "萨尼德罕": "加尔提斯商会",
+            "宏朝贵胄": "加尔提斯商会",
+            "高阶精灵": "森之祈愿",
+            "法拉希尔血裔": "森之祈愿",
+            "弗莱德里王族": "弗莱德里王族",
+            "古特雅尔": "北地自由民",
+            "切瓦利王族": "切瓦利王族",
+            "佩尔弗因王族": "佩尔弗因王族",
+            "希尔王族": "希尔王族",
+            "塞宁王族": "塞宁王族",
+            "玛夏贵族": "玛夏审判军",
+            "瑞格王室": "瑞格王室",
+            "黑暗精灵": "黑暗精灵",
+        }
         self._init_boxes()
         self._load_blood_names()
 
@@ -113,7 +130,8 @@ class MarryProcessor(CustomAction):
             ObjectsCount = 0
             if RecoDetail.hit:
                 text = RecoDetail.best_result.text
-                match = re.search(r"对象数量：(\d{1,2})", text)
+                logger.info(f"识别到的对象数量文本: {text}")
+                match = re.search(r"对象数量[：:](\d{1,2})", text)
                 if match:
                     ObjectsCount = int(match.group(1))
                     if ObjectsCount > 0:
@@ -121,6 +139,9 @@ class MarryProcessor(CustomAction):
                     else:
                         logger.info(f"当前联姻对象数量为{ObjectsCount}，无法进行联姻")
                         return CustomAction.RunResult(success=False)
+                else:
+                    logger.error(f"未识别到有效的对象数量文本: {text}")
+                    return CustomAction.RunResult(success=False)
             else:
                 logger.info("未识别到联姻对象数量")
                 return CustomAction.RunResult(success=False)
@@ -133,8 +154,9 @@ class MarryProcessor(CustomAction):
             if RecoEmail.hit:
                 text = RecoEmail.best_result.text
                 # 抽取回信数量（格式：回信数量：5/8）
-                match = re.search(r"回信数量：(\d+)/(\d+)", text)
+                match = re.search(r"回信数量[：:](\d+)/(\d+)", text)
                 if match:
+                    logger.info(f"识别到的回信数量文本: {text}")
                     current = int(match.group(1))
                     total = int(match.group(2))
 
@@ -145,6 +167,9 @@ class MarryProcessor(CustomAction):
                             f"当前回信数量：{current}/{total} 回信已满，无法继续联姻"
                         )
                         return CustomAction.RunResult(success=False)
+                else:
+                    logger.error(f"未识别到有效的回信数量文本: {text}")
+                    return CustomAction.RunResult(success=False)
             else:
                 logger.info("未识别到回信数量信息")
                 return CustomAction.RunResult(success=False)
@@ -200,17 +225,34 @@ class MarryProcessor(CustomAction):
             )
 
             # 3.1. 检查年龄, 大于等于45岁就不考虑了
-            age = extract_potential(context, "Age")
-            logger.info(f"识别年龄：{age}")
-            if age and int(age) >= 45:
-                logger.info(f"年龄 {age} 大于等于45岁，不考虑")
-                continue
+            RecoEmail = context.run_recognition(
+                "CastleMarry_AgeCheck",
+                context.tasker.controller.post_screencap().wait().get(),
+            )
+            if RecoEmail.hit:
+                age_text = RecoEmail.best_result.text
+                logger.debug(f"识别到的年龄文本: {age_text}")
+
+                # 抽取年龄（格式：年龄：45岁 或 年龄:45岁）
+                match = re.search(r"\d+", age_text)
+                if match:
+                    age = int(match.group())
+                    if age >= 45:
+                        logger.info(f"年龄 {age} 大于等于45岁，不考虑")
+                        context.run_task("BackButton_500ms")
+                        continue
+                    else:
+                        logger.info(f"年龄 {age} 小于45岁，考虑")
+                else:
+                    logger.warning(f"无法从识别文本 '{age_text}' 中提取年龄数字")
+            else:
+                logger.info("未识别到年龄信息, 跳过")
 
             # 3.2. 先进入血统面板，查看该苗子的潜力、血脉、特性面板，检查橙特：例如太阳、科内塔、上自专等（后续开发）
             context.run_task("RolePanel_BloodPage")
             potential, bloodline, features = extract_all_role_info(context)
 
-            highest_bloodline = get_highest_bloodline(bloodline)
+            highest_bloodline = self._get_highest_bloodline(bloodline)
             logger.info(f"最高血统：{highest_bloodline}")
 
             # 3.3. 根据血统确定联姻国家和种族
@@ -308,24 +350,6 @@ class MarryProcessor(CustomAction):
         Returns:
             (种族名称, 国家名称) 元组
         """
-        # 种族和国家映射配置
-        race_country_mapping = {
-            "祖扎尔达王族": "加尔提斯商会",
-            "瓦诺遗族": "加尔提斯商会",
-            "萨尼德罕": "加尔提斯商会",
-            "宏朝贵胄": "加尔提斯商会",
-            "高阶精灵": "森之祈愿",
-            "法拉希尔血裔": "森之祈愿",
-            "弗莱德里王族": "弗莱德里王族",
-            "古特雅尔": "北地自由民",
-            "切瓦利王族": "切瓦利王族",
-            "佩尔弗因王族": "佩尔弗因王族",
-            "希尔王族": "希尔王族",
-            "塞宁王族": "塞宁王族",
-            "玛夏贵族": "玛夏审判军",
-        }
-
-        # 模糊匹配关键词映射
         fuzzy_mapping = {
             "祖扎": ("祖扎尔达王族", "加尔提斯商会"),
             "瓦诺": ("瓦诺遗族", "加尔提斯商会"),
@@ -340,21 +364,47 @@ class MarryProcessor(CustomAction):
             "希尔": ("希尔王族", "希尔王族"),
             "塞宁": ("塞宁王族", "塞宁王族"),
             "玛夏": ("玛夏贵族", "玛夏审判军"),
+            "瑞格": ("瑞格王室", "瑞格王室"),
+            "黑暗": ("黑暗精灵", "黑暗精灵"),
         }
 
-        # 精确匹配
-        if bloodline in race_country_mapping:
+        if bloodline in self.race_country_mapping:
             race = bloodline
-            country = race_country_mapping[bloodline]
+            country = self.race_country_mapping[bloodline]
             return race, country
 
-        # 模糊匹配
         for keyword, (race, country) in fuzzy_mapping.items():
             if keyword in bloodline:
                 return race, country
 
-        # 都匹配不到，返回原始值和未知国家
         return bloodline, "未知"
+
+    def _get_highest_bloodline(self, bloodline: Bloodline) -> str:
+        """
+        从高血种族中获取最高血统
+        Args:
+            bloodline: Bloodline 对象
+        Returns:
+            最高血统名称（仅限高血种族）
+        """
+        if not bloodline.bloodlines:
+            return "未知"
+
+        high_blood_races = set(self.race_country_mapping.keys())
+
+        high_blood_bloodlines = {
+            name: percentage
+            for name, percentage in bloodline.bloodlines.items()
+            if name in high_blood_races
+        }
+
+        if not high_blood_bloodlines:
+            return "未知"
+
+        sorted_bloodlines = sorted(
+            high_blood_bloodlines.items(), key=lambda x: x[1], reverse=True
+        )
+        return sorted_bloodlines[0][0]
 
 
 @AgentServer.custom_action("WeddingProcessor")

@@ -93,7 +93,10 @@
     //识别当前相亲对象是否正在联姻
     "CastleMarryingCheck": {
         "recognition": "TemplateMatch",
-        "template": "Marry/MarriedFlag.png",
+        "template": [
+            "Marry/MarriedFlag.png",
+            "Marry/StarFlag.png"
+        ],
         "roi": [
             20,
             602,
@@ -178,8 +181,32 @@
         "timeout": 2000,
         "next": [
             "CastleMarrySelectCountry",
+            "CastleMarrySelectReject",
             "[JumpBack]CastleMarrySelectCountrySweepDown"
         ]
+    },
+    "CastleMarrySelectReject": {
+        "recognition": "OCR",
+        "expected": [
+            "还没活够",
+            "算了",
+            "很遗憾",
+            "没有人",
+            "什么",
+            "比起",
+            "结婚",
+            "伙计"
+        ],
+        "roi": [
+            189,
+            658,
+            434,
+            126
+        ],
+        "action": "Click",
+        "post_delay": 1000,
+        "timeout": 2000,
+        "focus": "被拒绝啦"
     },
     "CastleMarrySelectCountrySweepDown": {
         "recognition": "DirectHit",
@@ -333,6 +360,19 @@
         "next": [
             "PopUpWindowConfirm"
         ]
+    },
+    "CastleMarry_AgeCheck": {
+        "recognition": "OCR",
+        "roi": [
+            425,
+            80,
+            124,
+            56
+        ],
+        "expected": [
+            "[0-9]"
+        ],
+        "timeout": 2000
     },
     //城堡宴会
     "CastleParty": {
