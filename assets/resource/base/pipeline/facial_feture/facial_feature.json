@@ -1,0 +1,39 @@
+{
+    "精灵面部特征_专注之瞳": {
+        "recognition": "ColorMatch",
+        "upper": [
+            30,
+            174,
+            254
+        ],
+        "lower": [
+            20,
+            147,
+            203
+        ],
+        "method": 40,
+        "count": 50,
+        "roi": [
+            350,
+            84,
+            316,
+            467
+        ]
+    },
+    "精灵面部特征_上古灵性": {
+        "recognition": "NeuralNetworkClassify",
+        "model": "long_ear.onnx",
+        "labels": [
+            "non-ear",
+            "ear"
+        ],
+        "expected": 1,
+        "roi": [
+            501,
+            84,
+            105,
+            124
+        ],
+        "timeout": 2000
+    }
+}
