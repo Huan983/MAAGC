@@ -212,6 +212,77 @@
                 "科内塔之怒",
                 "太阳+科内塔之怒"
             ]
+        },
+        "选择刷取任务国家": {
+            "type": "select",
+            "description": "选择要刷取任务的目标城市",
+            "default_case": "雄月城",
+            "cases": [
+                {
+                    "name": "王座堡",
+                    "pipeline_override": {
+                        "EnterCity": {
+                            "expected": "王座堡"
+                        }
+                    }
+                },
+                {
+                    "name": "圣盾堡",
+                    "pipeline_override": {
+                        "EnterCity": {
+                            "expected": "圣盾堡"
+                        }
+                    }
+                },
+                {
+                    "name": "雄月城",
+                    "pipeline_override": {
+                        "EnterCity": {
+                            "expected": "雄月城"
+                        }
+                    }
+                },
+                {
+                    "name": "翠庭",
+                    "pipeline_override": {
+                        "EnterCity": {
+                            "expected": "翠庭"
+                        }
+                    }
+                },
+                {
+                    "name": "银风堡",
+                    "pipeline_override": {
+                        "EnterCity": {
+                            "expected": "银风堡"
+                        }
+                    }
+                },
+                {
+                    "name": "暮角城",
+                    "pipeline_override": {
+                        "EnterCity": {
+                            "expected": "暮角城"
+                        }
+                    }
+                },
+                {
+                    "name": "巴索罗姆",
+                    "pipeline_override": {
+                        "EnterCity": {
+                            "expected": "巴索罗姆"
+                        }
+                    }
+                },
+                {
+                    "name": "奥克尼尼",
+                    "pipeline_override": {
+                        "EnterCity": {
+                            "expected": "奥克尼尼"
+                        }
+                    }
+                }
+            ]
         }
     }
 }

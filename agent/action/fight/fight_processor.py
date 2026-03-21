@@ -22,6 +22,58 @@ def preprocess_events(context: Context) -> bool:
     return True
 
 
+def _ensure_at_target_city(context: Context, target_city: str) -> tuple:
+    """
+    检测当前城市是否为目标城市，如果不在则滑动地图寻找
+
+    Args:
+        context: MAA 上下文对象
+        target_city: 目标城市名称
+
+    Returns:
+        tuple: (是否在目标城市, 是否进行了城市迁移 并点击了确认)
+    """
+    max_swipe_times = 10
+
+    context.run_task("Map_MoveMainCityNow")
+    reco_detail = context.run_recognition(
+        "EnterCity",
+        context.tasker.controller.post_screencap().wait().get(),
+    )
+
+    if reco_detail.hit:
+        logger.info("已在目标城市")
+        return True, False
+
+    logger.info(f"不在目标城市，开始滑动寻找...")
+    for swipe_count in range(max_swipe_times):
+        logger.info(
+            f"滑动寻找目标城市 {target_city} ({swipe_count + 1}/{max_swipe_times})"
+        )
+        context.run_task("Map_MoveMainCityRight")
+
+        reco_detail = context.run_recognition(
+            "EnterCity",
+            context.tasker.controller.post_screencap().wait().get(),
+        )
+        if reco_detail.hit and reco_detail.best_result:
+            current_city = reco_detail.best_result.text
+            logger.info(f"滑动后当前城市: {current_city}")
+            if current_city == target_city:
+                context.run_task("EnterCity")
+                if context.run_recognition(
+                    "EnterCity_Confirm",
+                    context.tasker.controller.post_screencap().wait().get(),
+                ).hit:
+                    context.run_task("EnterCity_Confirm")
+                    logger.info("已到达目标城市")
+                    return True, True
+                logger.info("已到达目标城市")
+                return True, False
+
+    return False, False
+
+
 def detect_and_manage_event(context: Context, screenshot) -> str:
     """检测事件类型"""
     if context.run_recognition("Event_MercenaryJoin", screenshot).hit:
@@ -206,6 +258,25 @@ def process_single_month(context: Context) -> bool:
     logger.info("========== 开始月份处理 ==========")
 
     preprocess_events(context)
+
+    target_city_data = context.get_node_data("EnterCity")
+    target_city = (
+        target_city_data.get("recognition", {})
+        .get("param", {})
+        .get("expected", ["王座堡"])[0]
+        if target_city_data
+        else "王座堡"
+    )
+    logger.info(f"目标城市: {target_city}")
+    logger.info(f"EnterCity node_data: {target_city_data}")
+    reached, traveled = _ensure_at_target_city(context, target_city)
+    if not reached:
+        logger.error(f"无法到达目标城市: {target_city}")
+        return False
+
+    if traveled:
+        preprocess_events(context)
+        context.run_task("BackButton_500ms")
 
     month = check_current_month(context)
     if month is None:

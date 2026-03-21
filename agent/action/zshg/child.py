@@ -486,7 +486,11 @@ class ChildRec(CustomAction):
         for key in detection_keys:
             node_data = context.get_node_data(key)
             if node_data and node_data.get("enabled", False):
-                expected = node_data.get("expected", [])
+                expected = (
+                    node_data.get("recognition", {})
+                    .get("param", {})
+                    .get("expected", [])
+                )
                 if expected:
                     enabled_ids.append(expected[0])
                     logger.info(f"好苗子检测项启用: {key} -> {expected[0]}")

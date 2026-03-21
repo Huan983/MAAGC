@@ -131,9 +131,9 @@ def _preprocess_accept_task(context: Context) -> bool:
     if ensure_task_accepted(context):
         return True
 
+    # 左右滑动会快速锁定当前任务城市的主城
     context.run_task("Map_MoveMainCityLeft")
     context.run_task("Map_MoveMainCityRight")
-
     context.run_task("OpenCityTaskPanel")
     if context.run_recognition(
         "InTaskPannel", context.tasker.controller.post_screencap().wait().get()
