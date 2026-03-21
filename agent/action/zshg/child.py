@@ -41,12 +41,8 @@ def load_child_alert_conditions():
     global CHILD_ALERT_CONDITIONS
     if CHILD_ALERT_CONDITIONS is None:
         try:
-            project_root = os.path.dirname(
-                os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
-            )
-            config_file = os.path.join(
-                project_root, "assets", "table", "child_alert_conditions.json"
-            )
+            cwd_dir = os.getcwd()
+            config_file = os.path.join(cwd_dir, "table", "child_alert_conditions.json")
 
             if os.path.exists(config_file):
                 with open(config_file, "r", encoding="utf-8") as f:
