@@ -48,6 +48,10 @@ def detect_and_manage_event(context: Context, screenshot) -> str:
         logger.info("检测到提示事件")
         context.run_task("PopUpWindowTip")
         return "PopUpWindowTip"
+    elif context.run_recognition("Event_MercenarieRetire", screenshot).hit:
+        logger.info("检测到佣兵退休事件")
+        context.run_task("Event_MercenarieRetire")
+        return "mercenary_retire"
     else:
         return None
 

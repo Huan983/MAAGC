@@ -485,5 +485,76 @@
         "action": "Click",
         "post_delay": 500,
         "timeout": 2000
+    },
+    "Event_MercenarieRetire": {
+        "recognition": "OCR",
+        "expected": [
+            "我觉得很累了"
+        ],
+        "roi": [
+            123,
+            623,
+            470,
+            198
+        ],
+        "action": "Click",
+        "post_delay": 500,
+        "timeout": 2000,
+        "focus": "不好, 佣兵退休啦！！！！",
+        "next": [
+            "Event_MercenarieRetire_Agree"
+        ]
+    },
+    "Event_MercenarieRetire_Agree": {
+        "recognition": "OCR",
+        "expected": [
+            "同意"
+        ],
+        "roi": [
+            29,
+            472,
+            408,
+            270
+        ],
+        "action": "Click",
+        "post_delay": 500,
+        "timeout": 2000,
+        "next": [
+            "Event_MercenarieRetire_Finish",
+            "[JumpBack]ClickCenter_500ms"
+        ]
+    },
+    "Event_MercenarieRetire_Finish": {
+        "recognition": "OCR",
+        "expected": [
+            "发放退休金"
+        ],
+        "roi": [
+            258,
+            553,
+            213,
+            507
+        ],
+        "action": "Click",
+        "post_delay": 500,
+        "timeout": 2000,
+        "next": [
+            "Event_MercenarieRetire_Finish_Confirm"
+        ]
+    },
+    "Event_MercenarieRetire_Finish_Confirm": {
+        "recognition": "OCR",
+        "expected": [
+            "确定"
+        ],
+        "roi": [
+            221,
+            534,
+            271,
+            559
+        ],
+        "action": "Click",
+        "post_delay": 500,
+        "timeout": 2000
     }
 }
