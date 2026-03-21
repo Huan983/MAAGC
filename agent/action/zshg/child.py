@@ -301,36 +301,6 @@ def evaluate_with_config(potential, features, enabled_condition_ids=None) -> tup
     return False, {}, ""
 
 
-def load_good_features() -> list:
-    """
-    加载好特性列表
-    Returns:
-        好特性列表
-        从 cwd_dir/table/good_features.json 读取
-    """
-    # 配置文件路径 - 使用当前工作目录作为基础路径
-    config_path = os.path.join(
-        os.getcwd(),
-        "table",
-        "good_features.json",
-    )
-
-    try:
-        with open(config_path, "r", encoding="utf-8") as f:
-            config = json.load(f)
-            good_features = config.get("good_features", [])
-            logger.info(
-                f"载入好特性列表成功，共 {len(good_features)} 个特性: {good_features}"
-            )
-            return good_features
-    except Exception as e:
-        logger.error(f"从 {config_path} 读取好特性配置文件失败: {e}")
-        # 返回默认好特性列表
-        default_features = ["太阳之子", "科内塔之怒"]
-        logger.info(f"使用默认好特性列表: {default_features}")
-        return default_features
-
-
 # 爵位等级
 title_rank: dict = {
     "公爵": 4,
@@ -367,8 +337,6 @@ class ChildRec(CustomAction):
         self.potential = None
         self.bloodline = None
         self.features = []
-        # 加载好特性列表，作为成员变量反复使用
-        self.good_features = load_good_features()
         # 好苗子提醒开关
         self.child_alert_enabled = child_alert_enabled
 
