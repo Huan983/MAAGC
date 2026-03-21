@@ -252,13 +252,14 @@ def evaluate_potential(potential) -> tuple:
     return is_good, detail_info
 
 
-def evaluate_with_config(potential, features) -> tuple:
+def evaluate_with_config(potential, features, enabled_condition_ids=None) -> tuple:
     """
     根据配置文件评估是否为好苗子
     支持多种条件配置，满足任一条件即触发提醒
     Args:
         potential: Potential 对象
         features: Feature 对象列表
+        enabled_condition_ids: 只检查指定的条件 ID 列表，如果为 None 则检查所有启用条件
     Returns:
         (是否为好苗子, 满足的条件信息, 匹配到的条件名称)
     """
@@ -268,24 +269,24 @@ def evaluate_with_config(potential, features) -> tuple:
     potential_values = potential.values
 
     for condition in conditions:
-        # 检查条件是否启用
-        if not condition.get("enabled", True):
-            continue
-
         condition_id = condition.get("id", "unknown")
+
+        if enabled_condition_ids is not None:
+            if condition_id not in enabled_condition_ids:
+                continue
+        else:
+            if not condition.get("enabled", True):
+                continue
+
         condition_name = condition.get("name", condition_id)
 
-        # 检查潜力条件
         potential_ok, potential_detail = check_potential_condition(
             potential_values, condition
         )
 
-        # 检查特性条件
         feature_ok, found_features = check_feature_condition(features, condition)
 
-        # 同时满足潜力和特性条件
         if potential_ok and feature_ok:
-            # 构建匹配的属性信息
             detail_info = {}
             for attr_name, (attr_value, grade) in potential_detail.items():
                 detail_info[attr_name] = (attr_value, grade)
@@ -332,35 +333,6 @@ def load_good_features() -> list:
         default_features = ["太阳之子", "科内塔之怒"]
         logger.info(f"使用默认好特性列表: {default_features}")
         return default_features
-
-
-def evaluate_features(features: list, good_features: list) -> tuple:
-    """
-    评估特性，专门检查"科内塔之怒"特性
-    Args:
-        features: Feature 对象列表
-        good_features: 好特性列表（此参数保留但不强制要求）
-    Returns:
-        (是否有科内塔之怒, 找到的特性列表)
-    """
-    found_good_features = []
-
-    # 专门检查科内塔之怒
-    koneita_zhi_nu = "科内塔之怒"
-
-    for feature in features:
-        feature_name = feature.name
-        # 检查是否包含科内塔之怒（考虑OCR识别误差）
-        if koneita_zhi_nu in feature_name:
-            found_good_features.append(feature_name)
-        # 也检查其他好特性（可选）
-        else:
-            for good_feature in good_features:
-                if good_feature in feature_name and good_feature != koneita_zhi_nu:
-                    found_good_features.append(feature_name)
-                    break
-
-    return len(found_good_features) > 0, found_good_features
 
 
 # 爵位等级
@@ -474,11 +446,6 @@ class ChildRec(CustomAction):
         if not parent_info.title:
             parent_info.title = "无爵位"
 
-        # logger.info(
-        #     f"{parent_type}信息：姓名={parent_info.name}, 爵位={parent_info.title}, "
-        #     f"佣兵团={parent_info.mercenary_group}"
-        # )
-
         return parent_info
 
     def compare_parent_titles(
@@ -506,6 +473,103 @@ class ChildRec(CustomAction):
             return mother_info.title, 1
         else:
             return father_info.title, 2
+
+    def _get_enabled_condition_ids(self, context: Context) -> list:
+        """
+        从 child_info.json 中获取所有启用状态为 true 的检测项的 expected 值
+        这些值对应对 child_alert_conditions.json 中的条件 ID
+        Args:
+            context: MAA 上下文
+        Returns:
+            启用的条件 ID 列表
+        """
+        enabled_ids = []
+
+        detection_keys = ["检测_科内塔之怒", "检测_太阳+科内塔之怒"]
+
+        for key in detection_keys:
+            node_data = context.get_node_data(key)
+            if node_data and node_data.get("enabled", False):
+                expected = node_data.get("expected", [])
+                if expected:
+                    enabled_ids.append(expected[0])
+                    logger.info(f"好苗子检测项启用: {key} -> {expected[0]}")
+
+        if not enabled_ids:
+            logger.info("未启用任何好苗子检测项")
+
+        return enabled_ids
+
+    def _check_and_show_good_child_alert(
+        self,
+        context: Context,
+        child_name: str,
+        highest_title: str,
+        child_index: int,
+    ) -> bool:
+        """
+        检查是否为好苗子并处理
+        Args:
+            context: MAA 上下文
+            child_name: 建议的孩子名字
+            highest_title: 最高爵位
+            child_index: 孩子序号
+        Returns:
+            True - 是好苗子（阻塞等待用户处理）
+            False - 不是好苗子（调用方应自动命名）
+        """
+        enabled_condition_ids = self._get_enabled_condition_ids(context)
+
+        is_good, match_info, condition_name = evaluate_with_config(
+            self.potential, self.features, enabled_condition_ids
+        )
+
+        if not is_good:
+            return False
+
+        potential_detail = match_info.get("potential", {})
+        good_feature_list = match_info.get("features", [])
+
+        s_count = sum(
+            1 for val, grade in potential_detail.values() if grade in ["S", "SS"]
+        )
+
+        alert_content = f"🎉 发现好苗子！\n\n"
+
+        if condition_name:
+            alert_content += f"【匹配条件】{condition_name}\n\n"
+
+        alert_content += "【潜力属性】\n"
+        for attr_name, (attr_value, grade) in potential_detail.items():
+            alert_content += f"{attr_name}: {grade} ({attr_value:.4f})\n"
+        alert_content += f"\nS及以上属性个数: {s_count}\n"
+
+        alert_content += "\n【特性】\n"
+        if good_feature_list:
+            alert_content += "好特性：" + ", ".join(good_feature_list) + "\n"
+        else:
+            alert_content += "无好特性\n"
+
+        alert_content += "\n【血脉】\n"
+        if self.bloodline.bloodlines:
+            for blood_name, blood_percent in self.bloodline.bloodlines.items():
+                alert_content += f"{blood_name}: {blood_percent}%\n"
+        else:
+            alert_content += "无血脉信息\n"
+
+        alert_content += f"\n【其他信息】\n"
+        alert_content += f"推荐名字: {child_name}\n"
+        alert_content += f"最高爵位: {highest_title}\n"
+        alert_content += f"孩子序号: 第{child_index}个\n\n"
+        alert_content += "请在游戏中手动为好苗子命名！"
+
+        context.run_task(
+            "UI_PopInform",
+            pipeline_override={"Node.Action.Succeeded": {"content": alert_content}},
+        )
+        logger.info("好苗子，弹出弹窗，等待用户手动处理")
+        context.tasker.post_stop()
+        return True
 
     def run(
         self, context: Context, argv: CustomAction.RunArg
@@ -557,89 +621,17 @@ class ChildRec(CustomAction):
         )
         logger.info(f"子孙命名：{child_name}")
 
-        # 6. 评估是否为好苗子（使用配置文件）
-        is_good, match_info, condition_name = evaluate_with_config(
-            self.potential, self.features
+        # 6. 检查是否为好苗子，如果是则弹窗或记录
+        if self._check_and_show_good_child_alert(
+            context, child_name, highest_title, child_index
+        ):
+            return CustomAction.RunResult(success=True)
+
+        # 7. 非好苗子或好苗子但关闭弹窗，自动输入命名
+        context.run_task("BackButton_500ms")
+        context.run_task(
+            "PannelChildSetName",
+            pipeline_override={"PannelChildSetNameCopy": {"input_text": child_name}},
         )
-
-        # 7. 如果是好苗子，根据开关决定是否弹出弹窗
-        if is_good and self.child_alert_enabled:
-            potential_detail = match_info.get("potential", {})
-            good_feature_list = match_info.get("features", [])
-
-            # 计算S及以上属性个数
-            s_count = sum(
-                1 for val, grade in potential_detail.values() if grade in ["S", "SS"]
-            )
-
-            # 构建弹窗内容
-            alert_content = f"🎉 发现好苗子！\n\n"
-
-            # 显示匹配的条件名称
-            if condition_name:
-                alert_content += f"【匹配条件】{condition_name}\n\n"
-
-            # 潜力信息
-            alert_content += "【潜力属性】\n"
-            for attr_name, (attr_value, grade) in potential_detail.items():
-                alert_content += f"{attr_name}: {grade} ({attr_value:.4f})\n"
-            alert_content += f"\nS及以上属性个数: {s_count}\n"
-
-            # 特性信息
-            alert_content += "\n【特性】\n"
-            if good_feature_list:
-                alert_content += "好特性：" + ", ".join(good_feature_list) + "\n"
-            else:
-                alert_content += "无好特性\n"
-
-            # 血脉信息
-            alert_content += "\n【血脉】\n"
-            if self.bloodline.bloodlines:
-                for blood_name, blood_percent in self.bloodline.bloodlines.items():
-                    alert_content += f"{blood_name}: {blood_percent}%\n"
-            else:
-                alert_content += "无血脉信息\n"
-
-            # 其他信息
-            alert_content += f"\n【其他信息】\n"
-            alert_content += f"推荐名字: {child_name}\n"
-            alert_content += f"最高爵位: {highest_title}\n"
-            alert_content += f"孩子序号: 第{child_index}个\n\n"
-            alert_content += "请在游戏中手动为好苗子命名！"
-
-            # 弹出阻塞式弹窗
-            context.run_task(
-                "UI_PopInform",
-                pipeline_override={"Node.Action.Succeeded": {"content": alert_content}},
-            )
-            logger.info("弹出好苗子弹窗，等待用户手动命名")
-            context.tasker.post_stop()
-
-            # 等待用户手动命名（暂停执行）
-            # 这里不自动输入名字，让用户自己命名
-        else:
-            # 普通苗子或关闭提醒功能，自动输入命名
-            if is_good:
-                # 记录好苗子信息但不弹出弹窗
-                logger.info(f"🎉 发现好苗子（提醒功能已关闭）")
-                logger.info(f"  匹配条件: {condition_name}")
-                if match_info.get("potential"):
-                    s_count = sum(
-                        1
-                        for val, grade in match_info["potential"].values()
-                        if grade in ["S", "SS"]
-                    )
-                    logger.info(f"  潜力: S及以上属性{s_count}个")
-                if match_info.get("features"):
-                    logger.info(f"  特性: {', '.join(match_info['features'])}")
-                logger.info(f"  推荐命名: {child_name}")
-
-            context.run_task("BackButton_500ms")
-            context.run_task(
-                "PannelChildSetName",
-                pipeline_override={
-                    "PannelChildSetNameCopy": {"input_text": child_name}
-                },
-            )
 
         return CustomAction.RunResult(success=True)

@@ -58,7 +58,8 @@
             "name": "推年",
             "entry": "Auto_YearlyTask",
             "option": [
-                "开启5月城堡相亲"
+                "开启5月城堡相亲",
+                "开启好娃提醒"
             ],
             "description": "自动执行年度任务流程并推进游戏时间"
         },
@@ -190,16 +191,26 @@
             "cases": [
                 {
                     "name": "科内塔之怒",
-                    "description": "纯血科内塔+ss技巧+s力量+敏/意0.3以上才提醒."
+                    "description": "纯血科内塔+ss技巧+s力量+敏/意0.3以上才提醒.",
+                    "pipeline_override": {
+                        "检测_科内塔之怒": {
+                            "enabled": true
+                        }
+                    }
                 },
                 {
-                    "name": "太阳+科内塔",
-                    "description": "太阳之子+科内塔+ss技巧+s力量+敏/意0.3以上才提醒."
+                    "name": "太阳+科内塔之怒",
+                    "description": "太阳之子+科内塔+ss技巧+s力量+敏/意0.3以上才提醒.",
+                    "pipeline_override": {
+                        "检测_太阳+科内塔之怒": {
+                            "enabled": true
+                        }
+                    }
                 }
             ],
             "default_case": [
                 "科内塔之怒",
-                "太阳+科内塔"
+                "太阳+科内塔之怒"
             ]
         }
     }

@@ -1,8 +1,7 @@
-feat: 增强孩子信息识别系统并重构资源文件结构
+refactor: 重构好苗子检测逻辑，支持动态启用检测条件
 
-- 优化child.py中的孩子信息识别逻辑，提升识别准确性
-- 新增role_utils.py角色信息工具模块，提供统一识别接口
-- 重构资源文件结构，将配置文件迁移至assets/table/目录
-- 添加战斗系统最大回合数警告机制，防止无限循环
-- 更新.gitignore忽略Trae IDE相关文件
-- 完善项目文档和战斗系统开发文档
+- evaluate_with_config 新增 enabled_condition_ids 参数，支持按条件ID过滤
+- 新增 _get_enabled_condition_ids 从 child_info.json 读取启用状态
+- 新增 _check_and_show_good_child_alert 封装弹窗逻辑
+- 移除 extract_facial_features 函数及相关面部识别功能
+- 清理废弃的配置文件和文档

@@ -284,5 +284,17 @@
         "custom_action": "ChildRec",
         "post_delay": 500,
         "timeout": 2000
+    },
+    "检测_科内塔之怒": {
+        "expected": [
+            "koneita"
+        ],
+        "enabled": false
+    },
+    "检测_太阳+科内塔之怒": {
+        "expected": [
+            "sun_and_koneita"
+        ],
+        "enabled": false
     }
 }
