@@ -35,7 +35,9 @@ def _ensure_at_target_city(context: Context, target_city: str) -> tuple:
     """
     max_swipe_times = 10
 
-    context.run_task("Map_MoveMainCityNow")
+    context.run_task("Map_MoveMainCityLeft")
+    context.run_task("Map_MoveMainCityRight")
+
     reco_detail = context.run_recognition(
         "EnterCity",
         context.tasker.controller.post_screencap().wait().get(),
@@ -69,7 +71,7 @@ def _ensure_at_target_city(context: Context, target_city: str) -> tuple:
                     logger.info("已到达目标城市")
                     return True, True
                 logger.info("已到达目标城市")
-                return True, False
+                return True, True
 
     return False, False
 
@@ -255,7 +257,6 @@ def handle_warrior_festival(context: Context) -> bool:
 
 def process_single_month(context: Context) -> bool:
     """处理单个月份的完整流程"""
-    logger.info("========== 开始月份处理 ==========")
 
     preprocess_events(context)
 
@@ -268,7 +269,6 @@ def process_single_month(context: Context) -> bool:
         else "王座堡"
     )
     logger.info(f"目标城市: {target_city}")
-    logger.info(f"EnterCity node_data: {target_city_data}")
     reached, traveled = _ensure_at_target_city(context, target_city)
     if not reached:
         logger.error(f"无法到达目标城市: {target_city}")
@@ -327,13 +327,28 @@ class YearlyTaskProcessor(CustomAction):
             logger.error("无法回到大地图界面")
             return CustomAction.RunResult(success=False)
 
+        months_data = context.get_node_data("YearlyTaskMonths")
+        # logger.info(f"YearlyTaskMonths node_data: {months_data}")
+        total_months = (
+            int(
+                months_data.get("recognition", {})
+                .get("param", {})
+                .get("expected", ["12"])[0]
+            )
+            if months_data
+            else 12
+        )
+        logger.info(f"年度任务执行月份数: {total_months}")
+
         logger.info("团长大人, 您回来了！")
 
-        for month_offset in range(12):
+        for month_offset in range(total_months):
             if context.tasker.stopping:
-                logger.info(f"已停止处理第 {month_offset + 1}/12 个月")
+                logger.info(f"已停止处理第 {month_offset + 1}/{total_months} 个月")
                 break
-            logger.info(f"========== 开始处理第 {month_offset + 1}/12 个月 ==========")
+            logger.info(
+                f"========== 开始处理第 {month_offset + 1}/{total_months} 个月 =========="
+            )
             process_single_month(context)
             time.sleep(3)
 

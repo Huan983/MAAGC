@@ -50,16 +50,12 @@
             "description": "自动处理每日礼包、市场折扣、商城礼包和悬赏令领取"
         },
         {
-            "name": "推月",
-            "entry": "Auto_FightTask",
-            "description": "自动执行月度战斗任务和事件"
-        },
-        {
-            "name": "推年",
+            "name": "推年计划",
             "entry": "Auto_YearlyTask",
             "option": [
                 "开启5月城堡相亲",
-                "开启好娃提醒"
+                "开启好娃提醒",
+                "选择年度任务月份数"
             ],
             "description": "自动执行年度任务流程并推进游戏时间"
         },
@@ -279,6 +275,83 @@
                     "pipeline_override": {
                         "EnterCity": {
                             "expected": "奥克尼尼"
+                        }
+                    }
+                }
+            ]
+        },
+        "选择年度任务月份数": {
+            "type": "select",
+            "description": "选择年度任务的执行月份数",
+            "default_case": "12个月",
+            "cases": [
+                {
+                    "name": "6个月",
+                    "pipeline_override": {
+                        "YearlyTaskMonths": {
+                            "expected": [
+                                "6"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "12个月",
+                    "pipeline_override": {
+                        "YearlyTaskMonths": {
+                            "expected": [
+                                "12"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "24个月",
+                    "pipeline_override": {
+                        "YearlyTaskMonths": {
+                            "expected": [
+                                "24"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "36个月",
+                    "pipeline_override": {
+                        "YearlyTaskMonths": {
+                            "expected": [
+                                "36"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "60个月",
+                    "pipeline_override": {
+                        "YearlyTaskMonths": {
+                            "expected": [
+                                "60"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "120个月",
+                    "pipeline_override": {
+                        "YearlyTaskMonths": {
+                            "expected": [
+                                "120"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "240个月",
+                    "pipeline_override": {
+                        "YearlyTaskMonths": {
+                            "expected": [
+                                "240"
+                            ]
                         }
                     }
                 }
