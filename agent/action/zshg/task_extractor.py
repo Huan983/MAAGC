@@ -26,8 +26,6 @@ class TaskExtractor:
     # 类变量，用于缓存数据，避免重复加载
     _task_blacklist_cache = None
     _task_blacklist_file_cache = None
-    _task_names_cache = None
-    _task_names_file_cache = None
 
     def __new__(cls, roi: List[int] = None):
         # 单例模式实现
@@ -45,12 +43,8 @@ class TaskExtractor:
         self.accept_buttons = []
         # 使用当前工作目录作为基础路径
         cwd_dir = os.getcwd()
-        self.task_names_file = os.path.join(cwd_dir, "table", "task_names.json")
         logger.info(f"TaskExtractor初始化，当前工作目录: {cwd_dir}")
-        logger.info(f"任务名称文件路径: {self.task_names_file}")
 
-        # 使用缓存的类变量，避免重复加载
-        self.known_task_names = self._get_cached_task_names()
         self.task_blacklist_file = os.path.join(cwd_dir, "table", "task_blacklist.json")
         logger.info(f"黑名单文件路径: {self.task_blacklist_file}")
 
@@ -72,22 +66,6 @@ class TaskExtractor:
             logger.info("使用缓存的黑名单数据")
 
         return TaskExtractor._task_blacklist_cache
-
-    def _get_cached_task_names(self):
-        """获取缓存的task名称列表，避免重复加载"""
-        # 如果文件路径发生变化或缓存为空，重新加载
-        if (
-            TaskExtractor._task_names_cache is None
-            or TaskExtractor._task_names_file_cache != self.task_names_file
-        ):
-
-            TaskExtractor._task_names_file_cache = self.task_names_file
-            TaskExtractor._task_names_cache = self._load_task_names()
-            logger.info("任务名称缓存已更新")
-        else:
-            logger.info("使用缓存的任务名称数据")
-
-        return TaskExtractor._task_names_cache
 
     def _load_task_blacklist(self):
         try:
@@ -182,45 +160,6 @@ class TaskExtractor:
             return result.get("box", [0, 0, 0, 0])
         return [0, 0, 0, 0]
 
-    def _load_task_names(self):
-        """从文件加载已识别的任务名称"""
-        try:
-            import os
-            import json
-
-            # 检查文件是否存在
-            if os.path.exists(self.task_names_file):
-                with open(self.task_names_file, "r", encoding="utf-8") as f:
-                    task_names = json.load(f)
-                    logger.info(f"载入任务名称列表成功，共 {len(task_names)} 个任务")
-                    return set(task_names)
-            else:
-                # 文件不存在，创建空文件
-                os.makedirs(os.path.dirname(self.task_names_file), exist_ok=True)
-                with open(self.task_names_file, "w", encoding="utf-8") as f:
-                    json.dump([], f, ensure_ascii=False, indent=2)
-                logger.info(f"任务名称文件不存在，已创建空文件: {self.task_names_file}")
-                return set()
-        except Exception as e:
-            logger.error(f"载入任务名称列表失败: {e}")
-            return set()
-
-    def _save_task_names(self):
-        """保存已识别的任务名称到文件"""
-        try:
-            import os
-            import json
-
-            # 确保目录存在
-            os.makedirs(os.path.dirname(self.task_names_file), exist_ok=True)
-
-            # 保存任务名称
-            task_names_list = list(self.known_task_names)
-            with open(self.task_names_file, "w", encoding="utf-8") as f:
-                json.dump(task_names_list, f, ensure_ascii=False, indent=2)
-        except Exception:
-            pass
-
     def _is_task_name_candidate(self, text: str, y_pos: int) -> bool:
         """判断是否为任务名称候选"""
         # 文本长度判断：任务名称通常较短
@@ -258,10 +197,6 @@ class TaskExtractor:
         if text.startswith(("x", "X", "×")) and len(text) > 1 and text[1:].isdigit():
             return False
 
-        # 检查是否为已知任务名称
-        if text in self.known_task_names:
-            return True
-
         # 基于位置和上下文的启发式判断
         # 这里可以根据实际情况调整位置阈值
         if y_pos < 300 or y_pos > 1200:
@@ -289,13 +224,6 @@ class TaskExtractor:
 
                     # 如果垂直间距大于阈值，认为是新任务
                     if box_y - prev_box_y > 50:
-                        # 检查任务名称是否已存在，避免重复写入
-                        if text not in self.known_task_names:
-                            # 将新识别的任务名称添加到已知列表
-                            self.known_task_names.add(text)
-                            # 保存到文件
-                            self._save_task_names()
-
                         groups.append(current_group)
                         current_group = [res]
                     else:
@@ -303,10 +231,6 @@ class TaskExtractor:
                         current_group.append(res)
                 else:
                     # 第一个元素，直接作为新任务的开始
-                    # 检查任务名称是否已存在，避免重复写入
-                    if text not in self.known_task_names:
-                        self.known_task_names.add(text)
-                        self._save_task_names()
                     current_group = [res]
             else:
                 # 非任务名称，添加到当前组
