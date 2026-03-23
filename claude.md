@@ -1,137 +1,159 @@
-# 工作流规则
+<!--
+⚠️ 同步规则 (Sync Rule):
+This file is maintained in both English and Chinese.
+ANY change to one file MUST be mirrored to the other.
+- claude.md (English) ↔ claude_cn.md (中文)
+当修改此文件时，请同步更新另一个语言版本。
+-->
 
-## 1. 计划节点默认设置
+# CLAUDE.md
 
-- 对于任何非 trivial 的任务（3 个以上步骤或架构决策），进入计划模式。
-- 如果事情出错，立即停止并重新规划 — 不要继续推进。
-- 在验证步骤中使用计划模式，而不仅仅是构建。
-- 提前编写详细规格说明以减少歧义。
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## 2. 子代理策略
+## MaaGC Project Overview
 
-- 自由使用子代理以保持主内容窗口整洁。
-- 将研究、探索和并行分析任务委托给子代理。
-- 对于复杂问题，通过子代理投入更多计算资源。
-- 每个子代理一个任务，以集中执行。
+MaaGC is an automation assistant tool for "Gods' Crown / Century Knights" game, developed based on [MaaFramework](https://github.com/MaaXYZ/MaaFramework). It provides automated features for mercenary cultivation, marriage and children, bloodline inheritance, combat adventures, etc.
 
-## 3. 自我提升循环
+### Core Features
 
-- 在用户进行任何修正后：使用该模式更新 `tasks/lessons.md` 文件。
-- 为自己写规则，防止同样的错误再次发生。
-- 粗暴地迭代这些教训，直到错误率下降。
-- 在会议开始时回顾与相关项目相关的经验教训。
+| Module | Description | Entry Task |
+|--------|-------------|------------|
+| Game Launch | Auto-launch game client | GameStartUp |
+| Monthly Push | Monthly task automation | Auto_FightTask |
+| Yearly Push | Yearly task automation | Auto_YearlyTask |
+| Daily Tasks | Daily礼包, market discounts, shop礼包, bounties | Auto_DailyTask |
+| Child Info Recognition | Identify child attributes/bloodlines/features and name them | Auto_PannelCheck |
+| Matchmaking | Identify candidates and match high-bloodline names | Auto_MarryTask |
+| Wedding System | Choose banquet tier based on title | CastleWedding |
 
-## 4. 完成前验证
+### Project Architecture
 
-- 不要未经验证就标记任务完成。
-- 在相关情况下，比较主分支与你所做的更改之间的行为差异。
-- 自问："员工工程师会批准这个吗？"
-- 运行测试，检查日志，展示正确性。
+```struct
+agent/                    # Core automation logic
+├── action/
+│   ├── fight/            # Combat related
+│   └── zshg/             # Gods' Crown game logic
+│       ├── child.py      # Child info recognition
+│       ├── marry.py      # Matchmaking/Wedding system
+│       ├── daily_task.py # Daily tasks
+│       └── role_utils.py # Role info common module
+└── main.py               # Main entry
 
-## 5. 需求优雅（平衡）
-
-- 对于非小改动：暂停并询问"是否有更优的方案？"
-- 如果修复感觉很 hacky："知道我现在所了解的一切，实现优雅的解决方案。"
-- 对于简单的、常见的修复，跳过此步骤 — 不要过度工程化。
-- 在展示自己的作品前，先对其提出质疑。
-
-## 6. 自主修复错误
-
-- 当收到错误报告时：直接修复它。不要要求指导。
-- 指向日志、错误和失败的测试 — 然后解决它们。
-- 用户无需进行任何上下文切换。
-- 在未被告知的情况下自行修复失败的 CI 测试。
-
-## 任务管理
-
-1. **先计划**：在 `tasks/todo.md` 中编写可检查的计划项。
-2. **验证计划**：在开始实现前检查。
-3. **跟踪进度**：在进行中标记任务完成状态。
-4. **解释变更**：每一步都进行高层级的总结。
-5. **记录结果**：在 `tasks/todo.md` 中添加评审部分。
-6. **记录经验教训**：修正后更新 `tasks/lessons.md` 文件。
-
-## 核心原则
-
-- **简单优先**：让每次更改尽可能简化，影响最小化代码。
-- **无懈怠**：找出根本原因。不要使用临时修复。遵循高级开发者的标准。
-
-## MaaGC 项目理解文档
-
-## 1. 项目概述
-
-MaaGC 是一款基于 [MaaFramework](https://github.com/MaaXYZ/MaaFramework) 开发的诸神皇冠/百年骑士团游戏自动化助手工具，旨在为玩家提供便捷的游戏自动化功能。
-
-## 2. 游戏背景
-
-- **游戏名称**: 诸神皇冠/百年骑士团
-- **类型**: 策略战旗类游戏
-- **核心玩法**: 佣兵养成、结婚生子、血统遗传、战斗冒险
-
-## 3. 核心功能
-
-| 功能模块 | 功能描述 | 入口任务 |
-|---------|---------|----------|
-| **基础功能** | | |
-| 启动游戏 | 自动启动游戏客户端 | GameStartUp |
-| **任务自动化** | | |
-| 推月 | 月度任务自动化 | Auto_FightTask |
-| 推年 | 年度任务自动化 | Auto_YearlyTask |
-| 每日任务 | 综合处理每日礼包、市场折扣、商城礼包和悬赏令 | Auto_DailyTask |
-| **市场与商城** | | |
-| 市场折扣 | 大地图市场管理 | BigMapMarket |
-| 商城免费礼包 | 商城物品领取 | BigMapMall |
-| 悬赏令 | 悬赏令令牌领取 | BigMapRewardToken |
-| **角色系统** | | |
-| 孩子信息识别 | 识别子女属性/血脉/特性并命名 | Auto_PannelCheck |
-| 相亲匹配 | 识别相亲对象并匹配高血统姓名 | 待添加 |
-| 婚礼系统 | 根据爵位选择宴会档位 | CastleWedding |
-
-## 4. 项目架构
-
-详见 [项目概述](./docs/zh_cn/项目概述.md)
-
-## 5. 核心概念
-
-详见 [项目概述](./docs/zh_cn/项目概述.md#5-核心概念)
-
-## 6. 核心模块详解
-
-详见 [项目概述](./docs/zh_cn/项目概述.md#6-核心模块详解)
-
-## 7. 开发指南
-
-### 7.1 开发注意事项
-
-1. **设计规范分离**: 设计类内容（数据结构、命名规则、爵位等级等）应放在专门的子文档中
-2. **ROI 规范**: 使用 `roi` 而非 `crop_box`，更符合 MAA 标准
-3. **容错设计**: `expected` 使用数组提高识别容错率
-4. **属性处理**: 属性区间应该是连续的，避免空隙
-5. **动态内容**: 使用锚点定位 + 相对坐标计算
-6. **滚动面板**: 连续失败 2 次时终止识别
-7. **Table 路径引用**: 引用 `assets/table/` 下的配置文件时，统一使用 `cwd_dir + "table/xxx.json"` 路径格式
-
-### 7.2 常用开发命令
-
-```bash
-# 编译检查
-python -m py_compile agent/action/zshg/marry.py
-
-# 资源检查
-python check_resource.py
-
-# 运行主程序
-python agent/main.py
+assets/
+├── table/                # Configuration tables
+│   ├── high_blood_names.json    # High bloodline name table
+│   └── child_alert_conditions.json  # Good seedling conditions
+└── resource/base/pipeline/  # Pipeline JSON config
+    ├── main_ui.json      # Main interface
+    ├── marry.json        # Matchmaking system
+    └── child_info.json   # Child info
 ```
 
-### 7.3 测试功能
+## Common Development Commands
 
-详见 [项目概述](./docs/zh_cn/项目概述.md#7-测试功能)
+```bash
+python -m py_compile agent/action/zshg/marry.py  # Compile check
+python check_resource.py                          # Resource check
+python agent/main.py                              # Run main program
+```
 
-### 7.4 参考文档
+## Development Notes
 
-详见 [项目概述](./docs/zh_cn/项目概述.md#8-参考文档)
+1. **ROI Standard**: Use `roi` instead of `crop_box`
+2. **Fault Tolerance**: Use arrays in `expected` to improve recognition fault tolerance
+3. **Continuous Ranges**: Attribute ranges should be continuous, avoid gaps
+4. **Scroll Panels**: Terminate recognition after 2 consecutive failures
+5. **Table Paths**: When referencing `assets/table/`, use `cwd_dir + "table/xxx.json"` format
+6. **Pre-commit**: JSON/YAML auto-formatting (oxipng images, prettier config)
 
-## 8. 工具与资源
+## Required Reading
 
-详见 [项目概述](./docs/zh_cn/项目概述.md#9-工具与资源)
+- `docs/maafw_doc/3.1-任务流水线协议.md` - Task Pipeline Protocol (**必读 before adding new features**)
+- `docs/maafw_doc/3.3-ProjectInterfaceV2协议.md` - External Interface Protocol (**必读 before adding new features**)
+- `docs/zh_cn/项目概述.md` - Project overview and detailed architecture
+- `docs/zh_cn/设计规范.md` - Data structures, title levels, naming conventions
+
+## Data Structures
+
+```python
+@dataclass
+class Potential:
+    values: dict[str, float]  # Attribute name -> value (0.0-1.0)
+
+@dataclass
+class Bloodline:
+    bloodlines: dict[str, float]  # Bloodline name -> percentage
+
+@dataclass
+class Feature:
+    name: str
+    is_hidden: bool = False
+
+@dataclass
+class ParentInfo:
+    name: str
+    title: str      # "Duke", "Earl", "Baron", "Knight", "No Title"
+    mercenary_group: str
+```
+
+**Title Levels**: Duke(4) > Earl(3) > Baron(2) > Knight(1) > No Title(0)
+
+**Attribute Levels**: SS(>0.93) > S(0.74-0.93) > A(0.55-0.74) > B(0.35-0.55) > C(0.20-0.35) > D(0.10-0.20) > E(<0.10)
+
+## Workflow Rules
+
+### 1. Plan Node Default Settings
+
+- For any non-trivial tasks (3+ steps or architectural decisions), enter plan mode.
+- If something goes wrong, stop immediately and replan — don't keep pushing forward.
+- Use plan mode during verification steps, not just during construction.
+- Write detailed specifications upfront to reduce ambiguity.
+
+### 2. Sub-agent Strategy
+
+- Freely use sub-agents to keep the main content window clean.
+- Delegate research, exploration, and parallel analysis tasks to sub-agents.
+- For complex problems, invest more compute resources through sub-agents.
+- One sub-agent per task to stay focused.
+
+### 3. Self-improvement Loop
+
+- After any user correction: use that mode to update the `tasks/lessons.md` file.
+- Write rules for yourself to prevent the same mistakes from happening again.
+- Iteratively brutalize these lessons until error rates drop.
+- Review lessons related to the current project at the start of sessions.
+
+### 4. Pre-completion Verification
+
+- Don't mark tasks complete without verification.
+- When relevant, compare behavior differences between main branch and your changes.
+- Ask yourself: "Would a staff engineer approve this?"
+- Run tests, check logs, demonstrate correctness.
+
+### 5. Requirements Grace (Balance)
+
+- For non-trivial changes: pause and ask "Is there a better approach?"
+- If a fix feels hacky: "Given everything I know now, implement an elegant solution."
+- For simple, common fixes, skip this step — don't over-engineer.
+- Question your work before presenting it.
+
+### 6. Self-directed Error Fixing
+
+- When receiving error reports: fix it directly. Don't ask for guidance.
+- Point to logs, errors, and failing tests — then fix them.
+- Users don't need any context switching.
+- Fix failing CI tests on your own without being told.
+
+## Task Management
+
+1. **Plan First**: Write checkable plan items in `tasks/todo.md`.
+2. **Verify Plan**: Check before starting implementation.
+3. **Track Progress**: Mark in-progress items as complete.
+4. **Explain Changes**: Summarize each step at a high level.
+5. **Record Results**: Add a review section in `tasks/todo.md`.
+6. **Record Lessons Learned**: Update `tasks/lessons.md` after corrections.
+
+## Core Principles
+
+- **Simplicity First**: Make every change as simple as possible, minimize code impact.
+- **No Slack**: Find root causes. Don't use temporary fixes. Follow senior developer standards.
