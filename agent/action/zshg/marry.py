@@ -48,8 +48,21 @@ class MarryProcessor(CustomAction):
             "瑞格王室": "瑞格王室",
             "黑暗精灵": "黑暗精灵",
         }
+        # 联姻状态属性
+        self._objects_count: int = 0  # 相亲对象总数量
+        self._email_current: int = 0  # 当前约会人数
+        self._email_total: int = 0  # 最大约会人数
+        self._processed_count: int = 0  # 已处理的数量
+        self._reset_state()
         self._init_boxes()
         self._load_blood_names()
+
+    def _reset_state(self) -> None:
+        """重置联姻状态（每次运行前调用）"""
+        self._objects_count = 0
+        self._email_current = 0
+        self._email_total = 0
+        self._processed_count = 0
 
     def _load_blood_names(self) -> None:
         """
@@ -108,89 +121,127 @@ class MarryProcessor(CustomAction):
     def run(
         self, context: Context, argv: CustomAction.RunArg
     ) -> CustomAction.RunResult:
-        # 0. 五月触发联姻事件
+        """处理联姻任务主流程"""
+        self._reset_state()  # 重置状态
 
-        # 1. 首先先进入联姻界面，查看是否有联姻次数。
-        # 1.0 先进入联姻大厅
-        context.run_task("CastleHall")
-
-        if context.run_recognition(
-            "CastleMarryWindow", context.tasker.controller.post_screencap().wait().get()
-        ).hit:
-            logger.info("联姻界面已显示")
-
-            # 1.1检查相亲次数
-            img = context.tasker.controller.post_screencap().wait().get()
-            RecoDetail = context.run_recognition(
-                "CastleMarryObjectsCheck",
-                img,
-            )
-
-            # 1.2 检查还有没有相亲对象
-            ObjectsCount = 0
-            if RecoDetail.hit:
-                text = RecoDetail.best_result.text
-                logger.info(f"识别到的对象数量文本: {text}")
-                match = re.search(r"对象数量[：:](\d{1,2})", text)
-                if match:
-                    ObjectsCount = int(match.group(1))
-                    if ObjectsCount > 0:
-                        logger.info(f"当前有 {ObjectsCount} 个联姻对象")
-                    else:
-                        logger.info(f"当前联姻对象数量为{ObjectsCount}，无法进行联姻")
-                        return CustomAction.RunResult(success=False)
-                else:
-                    logger.error(f"未识别到有效的对象数量文本: {text}")
-                    return CustomAction.RunResult(success=False)
-            else:
-                logger.info("未识别到联姻对象数量")
-                return CustomAction.RunResult(success=False)
-
-            # 1.3 检查是否有回信数量
-            RecoEmail = context.run_recognition(
-                "CastleMarryEmailsCheck",
-                img,
-            )
-            if RecoEmail.hit:
-                text = RecoEmail.best_result.text
-                # 抽取回信数量（格式：回信数量：5/8）
-                match = re.search(r"回信数量[：:](\d+)/(\d+)", text)
-                if match:
-                    logger.info(f"识别到的回信数量文本: {text}")
-                    current = int(match.group(1))
-                    total = int(match.group(2))
-
-                    if current < total:
-                        logger.info(f"当前回信数量：{current}/{total} 还可以进行联姻")
-                    else:
-                        logger.info(
-                            f"当前回信数量：{current}/{total} 回信已满，无法继续联姻"
-                        )
-                        return CustomAction.RunResult(success=False)
-                else:
-                    logger.error(f"未识别到有效的回信数量文本: {text}")
-                    return CustomAction.RunResult(success=False)
-            else:
-                logger.info("未识别到回信数量信息")
-                return CustomAction.RunResult(success=False)
-        else:
-            logger.error("联姻界面未进入,可能存在Bug")
+        # 前处理：检查联姻资格
+        candidates = self._pre_process(context)
+        if candidates is None:
             return CustomAction.RunResult(success=False)
 
-        # 2. 寻找相亲对象
-        # 使用已初始化的 self.all_boxes，检测每个格子里面是否有爵位（联姻对象）&& 每个格子是否正在联姻
-        available_boxes = []  # 存储可以相亲的 box 队列 [(row, col, box), ...]
+        # 正式处理：逐个处理相亲对象
+        self._main_process(context, candidates)
 
+        # 后处理：记录完成日志
+        self._post_process()
+        return CustomAction.RunResult(success=True)
+
+    # ==================== 前处理阶段 ====================
+
+    def _pre_process(self, context: Context) -> list:
+        """
+        前处理阶段：进入联姻界面，检查资格，查找可相亲对象
+        Returns:
+            可相亲对象列表，若失败返回 None
+        """
+        # 1. 检查联姻资格（界面进入、对象数量、回信数量）
+        if not self._check_marriage_eligibility(context):
+            return None
+
+        # 2. 寻找可相亲对象
+        available_boxes = self._find_available_candidates(context)
+        if not available_boxes:
+            logger.info("未发现可相亲对象")
+            return []
+
+        return available_boxes
+
+    def _check_marriage_eligibility(self, context: Context) -> bool:
+        """检查联姻资格：进入联姻界面、检查对象数量、回信数量"""
+        context.run_task("CastleHall")
+
+        if not context.run_recognition(
+            "CastleMarryWindow", context.tasker.controller.post_screencap().wait().get()
+        ).hit:
+            logger.error("联姻界面未进入,可能存在Bug")
+            return False
+
+        logger.info("联姻界面已显示")
         img = context.tasker.controller.post_screencap().wait().get()
+
+        if not self._check_objects_count(context, img):
+            return False
+
+        if not self._check_email_count(context, img):
+            return False
+
+        return True
+
+    def _check_objects_count(self, context: Context, img) -> bool:
+        """检查相亲对象数量"""
+        RecoDetail = context.run_recognition("CastleMarryObjectsCheck", img)
+
+        if RecoDetail.hit:
+            text = RecoDetail.best_result.text
+            logger.info(f"识别到的对象数量文本: {text}")
+            match = re.search(r"对象数量[：:](\d{1,2})", text)
+            if match:
+                self._objects_count = int(match.group(1))
+                if self._objects_count > 0:
+                    logger.info(f"当前有 {self._objects_count} 个联姻对象")
+                    return True
+                else:
+                    logger.info(f"当前联姻对象数量为{self._objects_count}，无法进行联姻")
+                    return False
+            else:
+                logger.error(f"未识别到有效的对象数量文本: {text}")
+                return False
+        else:
+            logger.info("未识别到联姻对象数量")
+            return False
+
+    def _check_email_count(self, context: Context, img) -> bool:
+        """检查回信数量"""
+        RecoEmail = context.run_recognition("CastleMarryEmailsCheck", img)
+
+        if RecoEmail.hit:
+            text = RecoEmail.best_result.text
+            match = re.search(r"回信数量[：:](\d+)/(\d+)", text)
+            if match:
+                logger.info(f"识别到的回信数量文本: {text}")
+                self._email_current = int(match.group(1))
+                self._email_total = int(match.group(2))
+
+                if self._email_current < self._email_total:
+                    logger.info(f"当前回信数量：{self._email_current}/{self._email_total} 还可以进行联姻")
+                    return True
+                else:
+                    logger.info(f"当前回信数量：{self._email_current}/{self._email_total} 回信已满，无法继续联姻")
+                    return False
+            else:
+                logger.error(f"未识别到有效的回信数量文本: {text}")
+                return False
+        else:
+            logger.info("未识别到回信数量信息")
+            return False
+
+    def _find_available_candidates(self, context: Context) -> list:
+        """扫描所有格子，找出可相亲的对象"""
+        available_boxes = []
+        img = context.tasker.controller.post_screencap().wait().get()
+
         for row_idx, row_boxes in enumerate(self.all_boxes):
             for col_idx, box in enumerate(row_boxes):
+                # 跳过正在相亲（约会中）的格子
                 if context.run_recognition(
                     "CastleMarryingCheck",
                     img,
                     pipeline_override={"CastleMarryingCheck": {"roi": box}},
                 ).hit:
+                    logger.debug(f"第{row_idx + 1}行第{col_idx + 1}列正在相亲")
                     continue
 
+                # 检查是否有爵位（可相亲对象）
                 if context.run_recognition(
                     "CastleMarryTitleCheck",
                     img,
@@ -201,146 +252,199 @@ class MarryProcessor(CustomAction):
                         f"发现可相亲对象：第{row_idx + 1}行第{col_idx + 1}列， box为{box}"
                     )
 
-        # 记录可用的相亲对象数量
         logger.info(f"可相亲队列大小：{len(available_boxes)}")
+        return available_boxes
 
-        # 3. 进行相亲 ing
-        # 循环条件：available_boxes 归零 or ObjectsCount 归零时，停止相亲
-        for row_idx, col_idx, box in available_boxes:
+    # ==================== 正式处理阶段 ====================
+
+    def _main_process(self, context: Context, candidates: list) -> None:
+        """正式处理阶段：逐个处理相亲对象"""
+        logger.info(f"开始正式处理，可相亲对象: {len(candidates)} 个，"
+                    f"当前约会: {self._email_current}/{self._email_total}，"
+                    f"对象总数: {self._objects_count}")
+
+        for row_idx, col_idx, box in candidates:
             if context.tasker.stopping:
                 logger.info("相亲任务已停止")
-                return CustomAction.RunResult(success=False)
+                break
 
-            roleBoxCenter = box[0] + box[2] // 2, box[1] + box[3] // 2
-            logger.info(
-                f"开始处理第{row_idx + 1}行第{col_idx + 1}列的相亲对象， boxCenter为{roleBoxCenter}"
-            )
-            # 3.1 每个相亲对象，单机选中角色，长按进入角色详情
-            context.tasker.controller.post_click(
-                roleBoxCenter[0], roleBoxCenter[1]
-            ).wait()
-            context.run_task(
-                "LongPressRole",
-                pipeline_override={"LongPressRole": {"target": roleBoxCenter}},
-            )
+            # 检查是否应该继续处理
+            if not self._should_continue():
+                logger.info("检测到联姻条件不满足，停止处理")
+                break
 
-            # 3.1. 检查年龄, 大于等于45岁就不考虑了
-            RecoEmail = context.run_recognition(
-                "CastleMarry_AgeCheck",
+            self._process_single_candidate(context, row_idx, col_idx, box)
+
+    def _should_continue(self) -> bool:
+        """检查是否应该继续处理下一个相亲对象"""
+        # 检查约会人数是否已满
+        if self._email_current >= self._email_total:
+            logger.info(f"约会人数已满 ({self._email_current}/{self._email_total})，无法继续")
+            return False
+
+        return True
+
+    def _process_single_candidate(
+        self, context: Context, row_idx: int, col_idx: int, box: list
+    ) -> None:
+        """处理单个相亲对象"""
+        roleBoxCenter = box[0] + box[2] // 2, box[1] + box[3] // 2
+        logger.info(
+            f"开始处理第{row_idx + 1}行第{col_idx + 1}列的相亲对象，"
+            f"boxCenter为{roleBoxCenter}"
+        )
+
+        # 3.1 点击选中角色并长按进入详情
+        self._enter_role_details(context, roleBoxCenter)
+
+        # 3.2 检查年龄，大于等于45岁则跳过（不占用处理名额）
+        if not self._check_and_filter_by_age(context):
+            return
+
+        # 通过年龄检查，占用处理名额
+        self._processed_count += 1
+
+        # 3.3 提取血统信息并确定联姻目标
+        target_race, target_country = self._evaluate_bloodline_and_get_target(context)
+        if not target_country or target_country == "未知":
+            logger.warning(f"未识别到联姻国家")
+            return
+
+        # 3.4 进入正式相亲页面进行匹配
+        self._execute_marriage_matching(context, target_race, target_country)
+
+        logger.info(f"完成第{row_idx + 1}行第{col_idx + 1}列的处理")
+
+    def _enter_role_details(self, context: Context, roleBoxCenter: tuple) -> None:
+        """点击角色并长按进入详情界面"""
+        context.tasker.controller.post_click(
+            roleBoxCenter[0], roleBoxCenter[1]
+        ).wait()
+        context.run_task(
+            "LongPressRole",
+            pipeline_override={"LongPressRole": {"target": roleBoxCenter}},
+        )
+
+    def _check_and_filter_by_age(self, context: Context) -> bool:
+        """检查年龄并过滤，大于等于45岁则跳过"""
+        RecoEmail = context.run_recognition(
+            "CastleMarry_AgeCheck",
+            context.tasker.controller.post_screencap().wait().get(),
+        )
+        if RecoEmail.hit:
+            age_text = RecoEmail.best_result.text
+            logger.debug(f"识别到的年龄文本: {age_text}")
+
+            match = re.search(r"\d+", age_text)
+            if match:
+                age = int(match.group())
+                if age >= 45:
+                    logger.info(f"年龄 {age} 大于等于45岁，不考虑")
+                    context.run_task("BackButton_500ms")
+                    return False
+                else:
+                    logger.info(f"年龄 {age} 小于45岁，考虑")
+        else:
+            logger.info("未识别到年龄信息, 跳过")
+
+        return True
+
+    def _evaluate_bloodline_and_get_target(self, context: Context) -> tuple:
+        """进入血统面板，评估血统并确定联姻国家和种族"""
+        context.run_task("RolePanel_BloodPage")
+        _, bloodline, _ = extract_all_role_info(context)
+
+        highest_bloodline = self._get_highest_bloodline(bloodline)
+        logger.info(f"最高血统：{highest_bloodline}")
+
+        target_race, target_country = self._get_marriage_info(highest_bloodline)
+        logger.info(f"联姻国家：{target_country}，联姻种族：{target_race}")
+
+        return target_race, target_country
+
+    def _execute_marriage_matching(
+        self,
+        context: Context,
+        target_race: str,
+        target_country: str,
+    ) -> None:
+        """执行联姻匹配流程"""
+        context.run_task("BackButton_500ms")
+        context.run_task(
+            "CastleMarrySelectStart",
+            pipeline_override={
+                "CastleMarrySelectCountry": {"expected": [target_country]}
+            },
+        )
+
+        # 循环匹配姓名
+        target_names = self.blood_names.get(target_race, [])
+        if not target_names:
+            logger.warning(f"{target_race} 的姓名表为空")
+            context.run_task("PopUpWindowCancel")
+            context.run_task("CastleMarryLeave")
+            return
+
+        match_found = self._match_name_in_loop(context, target_names, target_race)
+
+        if not match_found:
+            logger.warning(f"经过5次尝试，仍未找到匹配的姓名")
+            context.run_task("PopUpWindowCancel")
+            context.run_task("CastleMarryLeave")
+
+    def _match_name_in_loop(
+        self, context: Context, target_names: list, target_race: str
+    ) -> bool:
+        """循环匹配姓名，直到找到匹配的或达到最大次数"""
+        max_attempts = 5
+
+        for attempt in range(max_attempts):
+            logger.info(f"第 {attempt + 1}/{max_attempts} 次尝试匹配姓名")
+
+            context.run_task("CastleMarryJustThisButton")
+
+            reco_result = context.run_recognition(
+                "CastleMarryJustThisReadName",
                 context.tasker.controller.post_screencap().wait().get(),
             )
-            if RecoEmail.hit:
-                age_text = RecoEmail.best_result.text
-                logger.debug(f"识别到的年龄文本: {age_text}")
 
-                # 抽取年龄（格式：年龄：45岁 或 年龄:45岁）
-                match = re.search(r"\d+", age_text)
-                if match:
-                    age = int(match.group())
-                    if age >= 45:
-                        logger.info(f"年龄 {age} 大于等于45岁，不考虑")
-                        context.run_task("BackButton_500ms")
-                        continue
-                    else:
-                        logger.info(f"年龄 {age} 小于45岁，考虑")
-                else:
-                    logger.warning(f"无法从识别文本 '{age_text}' 中提取年龄数字")
-            else:
-                logger.info("未识别到年龄信息, 跳过")
+            if not reco_result.hit:
+                logger.warning(f"识别姓名失败, 请检查是否显示了姓名")
+                return False
 
-            # 3.2. 先进入血统面板，查看该苗子的潜力、血脉、特性面板，检查橙特：例如太阳、科内塔、上自专等（后续开发）
-            context.run_task("RolePanel_BloodPage")
-            potential, bloodline, features = extract_all_role_info(context)
+            detected_name = self._extract_name_from_ocr(reco_result.best_result.text)
+            if not detected_name:
+                return False
 
-            highest_bloodline = self._get_highest_bloodline(bloodline)
-            logger.info(f"最高血统：{highest_bloodline}")
-
-            # 3.3. 根据血统确定联姻国家和种族
-            target_race, target_country = self._get_marriage_info(
-                highest_bloodline
-            )  # 使用模糊匹配获取种族和国家
-            logger.info(f"联姻国家：{target_country}，联姻种族：{target_race}")
-            if not target_country or target_country == "未知":
-                logger.warning(f"未识别到联姻国家")
-                continue
-
-            # 4. 确定信息后，进入正式相亲页面，正式相亲
-            context.run_task("BackButton_500ms")
-            context.run_task(
-                "CastleMarrySelectStart",
-                pipeline_override={
-                    "CastleMarrySelectCountry": {"expected": [target_country]}
-                },
-            )
-
-            # 4.1 循环匹配姓名，直到找到匹配的或放弃
-            max_attempts = 5  # 最多尝试 5 次
-            match_found = False
-
-            for attempt in range(max_attempts):
-                logger.info(f"第 {attempt + 1}/{max_attempts} 次尝试匹配姓名")
-
-                # 4.1.1 直接判断该种族里有没有这个名字
-                target_names = self.blood_names.get(target_race, [])
-
-                if not target_names:
-                    logger.warning(f"{target_race} 的姓名表为空")
-                    break
-
-                # 4.1.2 点击"就这个"按钮，触发姓名识别
-                context.run_task("CastleMarryJustThisButton")
-
-                # 4.1.3 识别显示的姓名
-                reco_result = context.run_recognition(
-                    "CastleMarryJustThisReadName",
-                    context.tasker.controller.post_screencap().wait().get(),
+            if detected_name in target_names:
+                logger.info(
+                    f"姓名匹配成功：{detected_name} 在 {target_race} 的高血名单中"
                 )
-
-                if not reco_result.hit:
-                    logger.warning(f"识别姓名失败, 请检查是否显示了姓名")
-                    return CustomAction.RunResult(success=False)
-
-                # 4.1.4 提取识别到的姓名
-                ocr_text = reco_result.best_result.text
-                name_match = re.search(r"向([\u4e00-\u9fa5]{1,5})发送", ocr_text)
-                if not name_match:
-                    logger.warning(
-                        f"无法从 OCR 结果中提取姓名：{ocr_text}, 请检查是否显示了姓名"
-                    )
-                    return CustomAction.RunResult(success=False)
-
-                detected_name = name_match.group(1)
-                logger.info(f"提取到的姓名：{detected_name}")
-
-                # 4.1.6 判断姓名是否在高血名单中
-                if detected_name in target_names:
-                    logger.info(
-                        f"姓名匹配成功：{detected_name} 在 {target_race} 的高血名单中"
-                    )
-                    match_found = True
-                    # 点击"确定"确认相亲
-                    context.run_task("PopUpWindowConfirm")
-                    break
-                else:
-                    logger.info(
-                        f"姓名不匹配：{detected_name} 不在高血名单中，尝试下一个"
-                    )
-                    # 取消匹配
-                    context.run_task("PopUpWindowCancel")
-                    # 只有在不是最后一次尝试时，才点击"下一位"
-                    if attempt < max_attempts - 1:
-                        context.run_task("CastleMarryNextOneButton")
-
-            if not match_found:
-                logger.warning(f"经过{max_attempts}次尝试，仍未找到匹配的姓名")
-                # 点击"取消"退出
+                context.run_task("PopUpWindowConfirm")
+                self._email_current += 1  # 约会人数 +1
+                return True
+            else:
+                logger.info(f"姓名不匹配：{detected_name} 不在高血名单中，尝试下一个")
                 context.run_task("PopUpWindowCancel")
-                context.run_task("CastleMarryLeave")
+                if attempt < max_attempts - 1:
+                    context.run_task("CastleMarryNextOneButton")
 
-            logger.info(f"完成第{row_idx + 1}行第{col_idx + 1}列的处理")
+        return False
 
-        # 4. 结束相亲
-        return CustomAction.RunResult(success=True)
+    def _extract_name_from_ocr(self, ocr_text: str) -> str:
+        """从OCR文本中提取姓名"""
+        name_match = re.search(r"向([\u4e00-\u9fa5]{1,5})发送", ocr_text)
+        if not name_match:
+            logger.warning(f"无法从 OCR 结果中提取姓名：{ocr_text}")
+            return ""
+
+        return name_match.group(1)
+
+    # ==================== 后处理阶段 ====================
+
+    def _post_process(self) -> None:
+        """后处理阶段：记录完成日志"""
+        logger.info("联姻任务执行完成")
 
     def _get_marriage_info(self, bloodline: str) -> tuple[str, str]:
         """
