@@ -55,7 +55,8 @@
             "option": [
                 "开启5月城堡相亲",
                 "开启好娃提醒",
-                "选择年度任务月份数"
+                "选择年度任务月份数",
+                "自定义任务黑名单"
             ],
             "description": "自动执行年度任务流程并推进游戏时间"
         },
@@ -356,6 +357,28 @@
                     }
                 }
             ]
+        },
+        "自定义任务黑名单": {
+            "type": "input",
+            "label": "自定义任务黑名单",
+            "description": "输入要屏蔽的任务名称，被屏蔽的任务在年度任务中会自动跳过。\n\n**注意：**\n- 输入的任务名称会保存到本地文件 `assets/table/task_blacklist.json`\n- 重启后仍然生效，无需重新输入\n- 如需删除，请手动编辑 `assets/table/task_blacklist.json` 文件，从 blacklist 数组中移除对应名称",
+            "inputs": [
+                {
+                    "name": "任务名称",
+                    "description": "要屏蔽的任务名称（单个任务名称）",
+                    "default": "",
+                    "pipeline_type": "string",
+                    "verify": "^[^,，]+$",
+                    "pattern_msg": "任务名称不能包含逗号，请输入单个任务名称"
+                }
+            ],
+            "pipeline_override": {
+                "CustomTaskBlacklist": {
+                    "expected": [
+                        "{任务名称}"
+                    ]
+                }
+            }
         }
     }
 }

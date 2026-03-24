@@ -323,6 +323,15 @@ class YearlyTaskProcessor(CustomAction):
     ) -> CustomAction.RunResult:
         logger.info("========== 开始年度任务处理 ==========")
 
+        # 读取用户自定义的任务黑名单
+        blacklist_data = context.get_node_data("CustomTaskBlacklist")
+        if blacklist_data:
+            custom_blacklist = blacklist_data.get("recognition", {}).get("param", {}).get("expected", [""])[0]
+            if custom_blacklist:
+                from action.zshg.task_extractor import TaskExtractor
+                TaskExtractor.add_to_blacklist(custom_blacklist)
+                logger.info(f"已加载自定义任务黑名单: {custom_blacklist}")
+
         if not fight_utils.ensure_at_bigmap(context):
             logger.error("无法回到大地图界面")
             return CustomAction.RunResult(success=False)

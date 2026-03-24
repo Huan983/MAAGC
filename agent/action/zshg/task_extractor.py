@@ -84,6 +84,32 @@ class TaskExtractor:
             logger.error(f"载入黑名单失败: {e}")
             return set()
 
+    @classmethod
+    def add_to_blacklist(cls, task_names: str):
+        """动态添加任务名到黑名单（同时持久化到文件）
+
+        Args:
+            task_names: 逗号分隔的任务名称字符串，如 "任务A,任务B"
+        """
+        if not task_names:
+            return
+        names = [name.strip() for name in task_names.replace("，", ",").split(",") if name.strip()]
+        if not names:
+            return
+
+        # 添加到内存中的黑名单集合
+        for name in names:
+            cls._task_blacklist_cache.add(name)
+        logger.info(f"动态添加黑名单任务: {names}，当前黑名单共 {len(cls._task_blacklist_cache)} 个")
+
+        # 持久化到文件
+        try:
+            with open(cls._task_blacklist_file_cache, "w", encoding="utf-8") as f:
+                json.dump({"blacklist": list(cls._task_blacklist_cache)}, f, ensure_ascii=False, indent=4)
+            logger.info(f"黑名单已保存到文件: {cls._task_blacklist_file_cache}")
+        except Exception as e:
+            logger.error(f"保存黑名单到文件失败: {e}")
+
     def extract_tasks(self, ocr_results: List) -> List[TaskInfo]:
         if not ocr_results:
             return []

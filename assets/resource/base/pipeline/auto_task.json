@@ -51,6 +51,12 @@
             "24"
         ]
     },
+    "CustomTaskBlacklist": {
+        "recognition": "DirectHit",
+        "param": {
+            "expected": [""]
+        }
+    },
     "Auto_MarryTask": {
         "recognition": "DirectHit",
         "action": "Custom",
