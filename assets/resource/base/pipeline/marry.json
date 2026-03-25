@@ -55,7 +55,6 @@
             "[JumpBack]CastleEntry",
             "[JumpBack]CastleSwipeDown"
         ],
-        "focus": "成功进入联姻大厅",
         "timeout": 2000
     },
     "CastleHallEntry": {
@@ -137,7 +136,8 @@
             0,
             421,
             75
-        ]
+        ],
+        "focus": "成功进入联姻大厅"
     },
     // 进入联姻界面，查看联姻次数,
     "CastleMarryObjectsCheck": {

@@ -157,3 +157,17 @@ class ParentInfo:
 
 - **简单优先**：让每次更改尽可能简化，影响最小化代码。
 - **无懈怠**：找出根本原因。不要使用临时修复。遵循高级开发者的标准。
+
+## 测试技巧
+
+### Pipeline 测试
+
+测试 Pipeline JSON 文件时使用: `.trae/skills/pipeline-testing.md`
+
+要点：
+
+- 先连接设备（ADB 或窗口）
+- 使用 `run_pipeline` 并传入正确路径
+- **不要点击确认**（升级、供奉、购买等消耗资源的操作）
+- 使用 `BackButton_500ms`（main_ui.json）作为可靠的返回方式
+- 用测试总结格式记录结果

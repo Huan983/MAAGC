@@ -157,3 +157,17 @@ class ParentInfo:
 
 - **Simplicity First**: Make every change as simple as possible, minimize code impact.
 - **No Slack**: Find root causes. Don't use temporary fixes. Follow senior developer standards.
+
+## Testing Skills
+
+### Pipeline Testing
+
+When testing Pipeline JSON files, use: `.trae/skills/pipeline-testing.md`
+
+Key points:
+
+- Connect device first (ADB or Window)
+- Use `run_pipeline` with correct paths
+- **DO NOT click confirm** on resource-consuming actions (upgrades, offerings, purchases)
+- Use `BackButton_500ms` (main_ui.json) as reliable return
+- Record results in test summary format

@@ -516,6 +516,18 @@
         "timeout": 2000,
         "action": "Click"
     },
+    "BackButton_DirectHit": {
+        "recognition": "DirectHit",
+        "action": "Click",
+        "target": [
+            655,
+            11,
+            52,
+            43
+        ],
+        "post_delay": 500,
+        "timeout": 2000
+    },
     "PopUpWindowTip": {
         "recognition": "OCR",
         "roi": [
