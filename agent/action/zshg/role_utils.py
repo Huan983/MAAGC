@@ -423,8 +423,6 @@ def extract_all_role_info(context: Context) -> tuple:
     if not features:
         logger.info("未识别到特性")
 
-    logger.info(
-        f"角色信息识别完成：潜力 6 维，血脉{len(bloodline.bloodlines)}个，特性{len(features)}个"
-    )
+    logger.info("识别完成")
 
     return potential, bloodline, features

@@ -72,8 +72,10 @@
         "post_delay": 1000,
         "timeout": 2000
     },
-    // 城堡联姻
     "CastleMarryEntry": {
+        "attach": {
+            "description": "城堡联姻"
+        },
         "recognition": "OCR",
         "expected": [
             "联姻"
@@ -89,8 +91,10 @@
         "post_delay": 1000,
         "timeout": 2000
     },
-    //识别当前相亲对象是否正在联姻
     "CastleMarryingCheck": {
+        "attach": {
+            "description": "识别当前相亲对象是否正在联姻"
+        },
         "recognition": "TemplateMatch",
         "template": [
             "Marry/MarriedFlag.png",
@@ -125,8 +129,10 @@
         "post_delay": 1000,
         "timeout": 2000
     },
-    // 检查当前是否是联姻界面
     "CastleMarryWindow": {
+        "attach": {
+            "description": "检查当前是否是联姻界面"
+        },
         "recognition": "OCR",
         "expected": [
             "联姻"
@@ -139,8 +145,10 @@
         ],
         "focus": "成功进入联姻大厅"
     },
-    // 进入联姻界面，查看联姻次数,
     "CastleMarryObjectsCheck": {
+        "attach": {
+            "description": "进入联姻界面，查看联姻次数"
+        },
         "recognition": "OCR",
         "expected": [
             "对象数量：[0-9]{1,2}"
@@ -152,8 +160,10 @@
             152
         ]
     },
-    // 识别 正在联姻次数/最大联姻次数
     "CastleMarryEmailsCheck": {
+        "attach": {
+            "description": "识别正在联姻次数/最大联姻次数"
+        },
         "recognition": "OCR",
         "expected": [
             "回信数量：[0-9]/[0-9]"
@@ -226,8 +236,10 @@
         "post_delay": 500,
         "timeout": 2000
     },
-    //选择联姻国家
     "CastleMarrySelectCountry": {
+        "attach": {
+            "description": "选择联姻国家"
+        },
         "recognition": "OCR",
         "expected": [
             "森之祈愿"
@@ -261,8 +273,10 @@
         "timeout": 2000,
         "next": []
     },
-    // 了解一下
     "CastleMarryGetInfoButton": {
+        "attach": {
+            "description": "了解一下"
+        },
         "recognition": "OCR",
         "expected": [
             "再了解下"
@@ -278,8 +292,10 @@
         "timeout": 2000,
         "next": []
     },
-    // 了解全部
     "CastleMarryGetInfoButtonAll": {
+        "attach": {
+            "description": "了解全部"
+        },
         "recognition": "OCR",
         "expected": [
             "了解全部"
@@ -374,8 +390,10 @@
         ],
         "timeout": 2000
     },
-    //城堡宴会
     "CastleParty": {
+        "attach": {
+            "description": "城堡宴会"
+        },
         "recognition": "OCR",
         "expected": [
             "宴会"
@@ -390,8 +408,10 @@
         "post_delay": 1000,
         "timeout": 2000
     },
-    //城堡约会
     "CastleDate": {
+        "attach": {
+            "description": "城堡约会"
+        },
         "recognition": "OCR",
         "expected": [
             "约会"
@@ -405,5 +425,51 @@
         "action": "Click",
         "post_delay": 1000,
         "timeout": 2000
+    },
+    "CastleMarryMatchmakerSpeech": {
+        "attach": {
+            "description": "聊天看相-识别媒人说话内容"
+        },
+        "recognition": "OCR",
+        "roi": [
+            169,
+            399,
+            521,
+            151
+        ],
+        "expected": [],
+        "timeout": 3000
+    },
+    "CastleMarryFaceRating": {
+        "attach": {
+            "description": "聊天看相-识别颜值评价"
+        },
+        "recognition": "OCR",
+        "roi": [
+            300,
+            500,
+            350,
+            200
+        ],
+        "expected": [
+            "很萌",
+            "还行",
+            "一般",
+            "普通",
+            "好看",
+            "不错",
+            "漂亮"
+        ],
+        "timeout": 2000
+    },
+    "MarryModeSelect": {
+        "attach": {
+            "description": "联姻模式选择"
+        },
+        "recognition": "OCR",
+        "expected": [
+            "trait"
+        ],
+        "enabled": false
     }
 }

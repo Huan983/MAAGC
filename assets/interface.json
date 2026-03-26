@@ -379,6 +379,29 @@
                     ]
                 }
             }
+        },
+        "相亲模式": {
+            "type": "select",
+            "description": "选择要刷取任务的目标城市",
+            "default_case": "姓名相亲",
+            "cases": [
+                {
+                    "name": "姓名相亲",
+                    "pipeline_override": {
+                        "MarryModeSelect": {
+                            "expected": "high_blood"
+                        }
+                    }
+                },
+                {
+                    "name": "聊天相亲",
+                    "pipeline_override": {
+                        "MarryModeSelect": {
+                            "expected": "trait"
+                        }
+                    }
+                }
+            ]
         }
     }
 }

@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from math import log
 from maa.agent.agent_server import AgentServer
 from maa.context import Context
@@ -18,6 +18,12 @@ from .role_utils import (
     get_highest_bloodline,
     extract_all_role_info,
     Bloodline,
+)
+
+from .matchMarryProcessor import (
+    ChatCandidateProfile,
+    ChatMatchingDecider,
+    MatchmakerMessage,
 )
 
 
@@ -49,6 +55,7 @@ class MarryProcessor(CustomAction):
             "黑暗精灵": "黑暗精灵",
         }
         # 联姻状态属性
+        self._mode: str = "high_blood"  # 联姻模式
         self._objects_count: int = 0  # 相亲对象总数量
         self._email_current: int = 0  # 当前约会人数
         self._email_total: int = 0  # 最大约会人数
@@ -124,17 +131,40 @@ class MarryProcessor(CustomAction):
         """处理联姻任务主流程"""
         self._reset_state()  # 重置状态
 
+        # 获取并保存用户选择的模式
+        self._mode = self._get_selected_mode(context)
+
         # 前处理：检查联姻资格
         candidates = self._pre_process(context)
         if candidates is None:
             return CustomAction.RunResult(success=False)
 
-        # 正式处理：逐个处理相亲对象
+        # 正式处理阶段
         self._main_process(context, candidates)
 
         # 后处理：记录完成日志
         self._post_process()
         return CustomAction.RunResult(success=True)
+
+    def _get_selected_mode(self, context: Context) -> str:
+        """
+        获取用户选择的联姻模式
+
+        通过 option select 类型获取用户选择，
+        使用 context.get_node_data() 从 pipeline 节点中读取 expected 值
+        """
+        mode_data = context.get_node_data("MarryModeSelect")
+        if mode_data is None:
+            logger.warning("MarryModeSelect 节点未定义，使用默认模式 high_blood")
+            return "high_blood"
+
+        selected_mode = (
+            mode_data.get("recognition", {})
+            .get("param", {})
+            .get("expected", ["high_blood"])[0]
+        )
+        logger.info(f"选择的联姻模式: {selected_mode}")
+        return selected_mode
 
     # ==================== 前处理阶段 ====================
 
@@ -191,7 +221,9 @@ class MarryProcessor(CustomAction):
                     logger.info(f"当前有 {self._objects_count} 个联姻对象")
                     return True
                 else:
-                    logger.info(f"当前联姻对象数量为{self._objects_count}，无法进行联姻")
+                    logger.info(
+                        f"当前联姻对象数量为{self._objects_count}，无法进行联姻"
+                    )
                     return False
             else:
                 logger.error(f"未识别到有效的对象数量文本: {text}")
@@ -213,10 +245,14 @@ class MarryProcessor(CustomAction):
                 self._email_total = int(match.group(2))
 
                 if self._email_current < self._email_total:
-                    logger.info(f"当前回信数量：{self._email_current}/{self._email_total} 还可以进行联姻")
+                    logger.info(
+                        f"当前回信数量：{self._email_current}/{self._email_total} 还可以进行联姻"
+                    )
                     return True
                 else:
-                    logger.info(f"当前回信数量：{self._email_current}/{self._email_total} 回信已满，无法继续联姻")
+                    logger.info(
+                        f"当前回信数量：{self._email_current}/{self._email_total} 回信已满，无法继续联姻"
+                    )
                     return False
             else:
                 logger.error(f"未识别到有效的回信数量文本: {text}")
@@ -238,7 +274,7 @@ class MarryProcessor(CustomAction):
                     img,
                     pipeline_override={"CastleMarryingCheck": {"roi": box}},
                 ).hit:
-                    logger.debug(f"第{row_idx + 1}行第{col_idx + 1}列正在相亲")
+                    logger.debug(f"({row_idx + 1}, {col_idx + 1}) 正在相亲")
                     continue
 
                 # 检查是否有爵位（可相亲对象）
@@ -248,9 +284,7 @@ class MarryProcessor(CustomAction):
                     pipeline_override={"CastleMarryTitleCheck": {"roi": box}},
                 ).hit:
                     available_boxes.append((row_idx, col_idx, box))
-                    logger.info(
-                        f"发现可相亲对象：第{row_idx + 1}行第{col_idx + 1}列， box为{box}"
-                    )
+                    logger.info(f"发现可相亲对象：({row_idx + 1}, {col_idx + 1})")
 
         logger.info(f"可相亲队列大小：{len(available_boxes)}")
         return available_boxes
@@ -259,9 +293,11 @@ class MarryProcessor(CustomAction):
 
     def _main_process(self, context: Context, candidates: list) -> None:
         """正式处理阶段：逐个处理相亲对象"""
-        logger.info(f"开始正式处理，可相亲对象: {len(candidates)} 个，"
-                    f"当前约会: {self._email_current}/{self._email_total}，"
-                    f"对象总数: {self._objects_count}")
+        logger.info(
+            f"开始正式处理，可相亲对象: {len(candidates)} 个，"
+            f"当前约会: {self._email_current}/{self._email_total}，"
+            f"对象总数: {self._objects_count}"
+        )
 
         for row_idx, col_idx, box in candidates:
             if context.tasker.stopping:
@@ -273,26 +309,26 @@ class MarryProcessor(CustomAction):
                 logger.info("检测到联姻条件不满足，停止处理")
                 break
 
-            self._process_single_candidate(context, row_idx, col_idx, box)
+            self._process_single_candidate(context, box)
 
     def _should_continue(self) -> bool:
         """检查是否应该继续处理下一个相亲对象"""
         # 检查约会人数是否已满
         if self._email_current >= self._email_total:
-            logger.info(f"约会人数已满 ({self._email_current}/{self._email_total})，无法继续")
+            logger.info(
+                f"约会人数已满 ({self._email_current}/{self._email_total})，无法继续"
+            )
             return False
 
         return True
 
     def _process_single_candidate(
-        self, context: Context, row_idx: int, col_idx: int, box: list
+        self, context: Context, box: list
     ) -> None:
         """处理单个相亲对象"""
         roleBoxCenter = box[0] + box[2] // 2, box[1] + box[3] // 2
-        logger.info(
-            f"开始处理第{row_idx + 1}行第{col_idx + 1}列的相亲对象，"
-            f"boxCenter为{roleBoxCenter}"
-        )
+        self._processed_count += 1
+        logger.info(f"开始处理第{self._processed_count}个角色")
 
         # 3.1 点击选中角色并长按进入详情
         self._enter_role_details(context, roleBoxCenter)
@@ -313,13 +349,11 @@ class MarryProcessor(CustomAction):
         # 3.4 进入正式相亲页面进行匹配
         self._execute_marriage_matching(context, target_race, target_country)
 
-        logger.info(f"完成第{row_idx + 1}行第{col_idx + 1}列的处理")
+        logger.info(f"完成第{self._processed_count}个角色的处理")
 
     def _enter_role_details(self, context: Context, roleBoxCenter: tuple) -> None:
         """点击角色并长按进入详情界面"""
-        context.tasker.controller.post_click(
-            roleBoxCenter[0], roleBoxCenter[1]
-        ).wait()
+        context.tasker.controller.post_click(roleBoxCenter[0], roleBoxCenter[1]).wait()
         context.run_task(
             "LongPressRole",
             pipeline_override={"LongPressRole": {"target": roleBoxCenter}},
@@ -355,8 +389,6 @@ class MarryProcessor(CustomAction):
         _, bloodline, _ = extract_all_role_info(context)
 
         highest_bloodline = self._get_highest_bloodline(bloodline)
-        logger.info(f"最高血统：{highest_bloodline}")
-
         target_race, target_country = self._get_marriage_info(highest_bloodline)
         logger.info(f"联姻国家：{target_country}，联姻种族：{target_race}")
 
@@ -368,7 +400,7 @@ class MarryProcessor(CustomAction):
         target_race: str,
         target_country: str,
     ) -> None:
-        """执行联姻匹配流程"""
+        """执行联姻匹配流程（分支点）"""
         context.run_task("BackButton_500ms")
         context.run_task(
             "CastleMarrySelectStart",
@@ -377,7 +409,64 @@ class MarryProcessor(CustomAction):
             },
         )
 
-        # 循环匹配姓名
+        if self._mode == "trait":
+            self._execute_chat_matching(context)
+        else:
+            self._execute_high_blood_matching(context, target_race)
+
+    def _execute_chat_matching(self, context: Context) -> None:
+        """聊天看相模式：聊天收集信息、决策"""
+
+        profile = ChatCandidateProfile()
+        for round_num in range(10):
+            if context.tasker.stopping:
+                break
+            text = self._recognize_matchmaker_speech(context)
+            if text:
+                profile.chat_messages.append(
+                    MatchmakerMessage(round_num + 1, text, time.time())
+                )
+                decider = ChatMatchingDecider()
+                decider.extract_trait_from_message(
+                    text, profile, self.race_country_mapping
+                )
+                logger.info(text[:50])
+            state = self._detect_chat_state_from_text(text)
+            if state == "end":
+                break
+            context.run_task("CastleMarryGetInfoButton")
+        # 决策
+        bloodlines_str = (
+            ", ".join(profile.bloodlines.keys()) if profile.bloodlines else "无"
+        )
+        pos_str = ", ".join(profile.positive_traits) if profile.positive_traits else ""
+        neg_str = ", ".join(profile.negative_traits) if profile.negative_traits else ""
+        if pos_str and neg_str:
+            traits_str = f"特性={pos_str}，{neg_str}"
+        elif pos_str:
+            traits_str = f"特性={pos_str}"
+        else:
+            traits_str = f"特性={neg_str}"
+        decider = ChatMatchingDecider()
+        if decider.should_accept(profile):
+            logger.info(
+                f"接受该相亲对象 (评分 {profile.total_score:.4f}): "
+                f"姓名={profile.name}, 爵位={profile.title}, "
+                f"血脉={bloodlines_str}, {traits_str}"
+            )
+            context.run_task("CastleMarryJustThisButton")
+            context.run_task("PopUpWindowConfirm")
+            self._email_current += 1
+        else:
+            logger.info(
+                f"拒绝该相亲对象 (评分 {profile.total_score:.4f}): "
+                f"姓名={profile.name}, 爵位={profile.title}, "
+                f"血脉={bloodlines_str}, {traits_str}"
+            )
+            context.run_task("CastleMarryLeave")
+
+    def _execute_high_blood_matching(self, context: Context, target_race: str) -> None:
+        """High blood 模式：循环匹配姓名"""
         target_names = self.blood_names.get(target_race, [])
         if not target_names:
             logger.warning(f"{target_race} 的姓名表为空")
@@ -391,6 +480,42 @@ class MarryProcessor(CustomAction):
             logger.warning(f"经过5次尝试，仍未找到匹配的姓名")
             context.run_task("PopUpWindowCancel")
             context.run_task("CastleMarryLeave")
+
+    def _recognize_matchmaker_speech(self, context: Context) -> str:
+        """识别媒人说话内容"""
+        reco = context.run_recognition(
+            "CastleMarryMatchmakerSpeech",
+            context.tasker.controller.post_screencap().wait().get(),
+        )
+        return reco.best_result.text if reco.hit else ""
+
+    def _detect_chat_state_from_text(self, text: str) -> str:
+        """
+        根据媒人说话内容判断聊天状态
+
+        新4种状态：
+        - start: 开始阶段（"你想要知道什么信息"）
+        - ongoing: 过程中（正常信息 + 照片信息，默认）
+        - end: 结束阶段（"我能告诉你的就这么多了"）
+        - unknown: 无法识别（默认返回 ongoing）
+        """
+        if not text:
+            return "unknown"
+
+        # 开始阶段
+        if "想要知道什么信息" in text:
+            return "start"
+
+        # 结束阶段
+        if "我能告诉你的就这么多了" in text:
+            return "end"
+
+        # 照片阶段（过程中的照片信息）
+        if "他的芳容" in text or "他的相貌这样" in text:
+            return "ongoing"
+
+        # 默认：正常信息阶段（过程中）
+        return "ongoing"
 
     def _match_name_in_loop(
         self, context: Context, target_names: list, target_race: str

@@ -66,6 +66,11 @@ python agent/main.py                              # 运行主程序
 5. **Table 路径**: 引用 `assets/table/` 时使用 `cwd_dir + "table/xxx.json"` 格式
 6. **Pre-commit**: JSON/YAML 自动格式化 (oxipng 图片, prettier 配置)
 
+## MCP 工具使用
+
+- **图片理解**: 分析图片时，使用 `mcp__MiniMax__understand_image` 工具
+- **网络搜索**: 搜索外部信息时，使用 `mcp__MiniMax__web_search` 工具
+
 ## 必读文档
 
 - `docs/maafw_doc/3.1-任务流水线协议.md` - 任务流水线协议（**新增功能前必读**）
@@ -160,14 +165,41 @@ class ParentInfo:
 
 ## 测试技巧
 
-### Pipeline 测试
+### MaaFW Skill 手册
 
-测试 Pipeline JSON 文件时使用: `.trae/skills/pipeline-testing.md`
+使用 `.trae/skills/` 下的 skill 手册来开发和测试 pipeline：
 
-要点：
+| Skill | 用途 | 调用方式 |
+| ----- | --- | ------- |
+| `maafw-pipelinenode` | 编写 pipeline 节点，理解识别/动作类型，设计模式 | 阅读 `.trae/skills/maafw-pipelinenode/SKILL.md` |
+| `pipeline_testing` | 测试单个 pipeline 节点，验证识别/动作是否正常 | 使用 `/test-pipeline` 或阅读 `.trae/skills/pipeline_testing/SKILL.md` |
+| `option-pipeline` | 设计 interface.json 选项（select/switch/input/checkbox） | 阅读 `.trae/skills/option-pipeline/SKILL.md` |
 
-- 先连接设备（ADB 或窗口）
-- 使用 `run_pipeline` 并传入正确路径
-- **不要点击确认**（升级、供奉、购买等消耗资源的操作）
-- 使用 `BackButton_500ms`（main_ui.json）作为可靠的返回方式
-- 用测试总结格式记录结果
+### Pipeline 测试流程
+
+1. **连接设备**
+
+   ```python
+   find_adb_device_list()  # 或 find_window_list()
+   connect_adb_device(device_name="xxx")  # 或 connect_window()
+   ```
+
+2. **读取 pipeline 文件**
+
+   ```python
+   load_pipeline(pipeline_path="<pipeline_json_path>")
+   ```
+
+3. **逐个测试节点**
+
+   ```python
+   run_pipeline(controller_id=CONTROLLER_ID, pipeline_path=PIPELINE_PATH, entry="node_name", resource_path=RESOURCE_PATH)
+   ```
+
+4. **分析结果**
+   - `status == "succeeded"` + `all_results` 有内容 = 识别成功
+   - `score > 0.9` = 可靠的匹配
+
+5. **资源保护**：绝对不要点击升级、供奉、购买等消耗资源的确认按钮
+
+6. **返回**：使用 `main_ui.json` 中的 `BackButton_500ms` 作为最可靠的返回方式

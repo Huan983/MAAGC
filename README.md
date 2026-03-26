@@ -1,6 +1,6 @@
 <!-- markdownlint-disable MD033 MD041 -->
 <p align="center">
-  <img alt="LOGO" src="https://cdn.jsdelivr.net/gh/MaaAssistantArknights/design@main/logo/maa-logo_512x512.png" width="256" height="256" />
+  <img alt="LOGO" src="logo.png" width="256" height="256" />
 </p>
 
 <div align="center">
@@ -19,20 +19,24 @@
 ## 📋 功能特性
 
 ### 基础功能
+
 - **游戏启动/关闭** - 自动化启动和关闭游戏客户端
 - **任务管理** - 灵活配置和执行自动化任务
 
 ### 任务自动化
+
 - **推月** - 自动化处理每月例行任务
 - **推年** - 自动化处理每年例行任务
 - **每日任务** - 综合处理每日礼包、市场折扣、商城礼包和悬赏令
 
 ### 市场与商城
+
 - **市场折扣** - 自动识别和购买市场折扣物品
 - **商城免费礼包** - 自动领取商城免费礼包
 - **悬赏令** - 自动领取悬赏令奖励
 
 ### 角色系统
+
 - **孩子信息识别** - 自动识别子女属性、血脉和特性
 - **智能命名** - 根据子女属性和血脉自动生成合适的名字
 - **相亲匹配** - 智能识别相亲对象并匹配高血统姓名
@@ -58,7 +62,7 @@
 
 1. **下载文件** - 从上述渠道下载适合您的版本
 2. **解压文件** - 将下载的压缩包解压到任意目录
-3. **安装依赖** - 
+3. **安装依赖** -
    - Windows 用户：如果运行时提示缺少依赖，请安装 [Visual C++ 运行库](https://aka.ms/vs/17/release/vc_redist.x64.exe)
    - 确保已安装最新版本的 [MaaFramework](https://github.com/MaaXYZ/MaaFramework/releases)
 
@@ -67,12 +71,14 @@
 #### 1. 连接配置
 
 **模拟器连接**：
+
 - 支持主流安卓模拟器（雷电、夜神、MuMu 等）
 - 确保模拟器已开启 ADB 调试模式
 - 分辨率建议设置为 1280x720 或更高
 - 默认 ADB 端口为 5555，可在设置中自定义
 
 **PC 端连接**：
+
 - 支持 Windows 平台 PC 端游戏
 - 需要游戏窗口处于前台运行状态
 - 分辨率建议设置为 1280x720 或更高
@@ -96,18 +102,21 @@
 ## 📱 版本说明
 
 ### MFAA 版本
+
 - 基于 Avalonia UI 构建的跨平台图形界面
 - 提供直观的任务配置和操作界面
 - 适合大多数普通用户使用
 - 支持 Windows、macOS、Linux 系统
 
 ### MXU 版本
+
 - 基于 Tauri + React + TypeScript 构建的现代化界面
 - 更流畅的用户体验和更美观的界面设计
 - 资源占用低，启动速度快
 - 推荐使用此版本获得最佳体验
 
 ### PiCLI 版本
+
 - 命令行版本，无图形界面
 - 适合服务器环境或高级用户
 - 资源占用最低，可通过脚本自动化调用
@@ -125,12 +134,14 @@
 ### 本地开发
 
 1. **克隆项目**
+
    ```bash
    git clone https://github.com/KhazixW2/MAAGC.git
    cd MAAGC
    ```
 
 2. **初始化子模块**
+
    ```bash
    git submodule update --init --recursive
    ```
@@ -142,16 +153,19 @@
      - `rec.onnx`
      - `keys.txt`
    - 安装 Python 依赖：
+
      ```bash
      pip install -r requirements.txt
      ```
 
 4. **运行测试**
+
    ```bash
    python agent/main.py
    ```
 
 5. **资源检查**
+
    ```bash
    python check_resource.py
    ```
@@ -213,6 +227,7 @@ MAAGC/
 ### 2. OCR 识别失败，报错"Failed to load det or rec"？
 
 请确保已正确下载 OCR 资源文件到 `assets/resource/model/ocr/` 目录，需要包含：
+
 - `det.onnx`
 - `rec.onnx`
 - `keys.txt`

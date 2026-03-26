@@ -66,6 +66,11 @@ python agent/main.py                              # Run main program
 5. **Table Paths**: When referencing `assets/table/`, use `cwd_dir + "table/xxx.json"` format
 6. **Pre-commit**: JSON/YAML auto-formatting (oxipng images, prettier config)
 
+## MCP Tools Usage
+
+- **Image Understanding**: When analyzing images, use `mcp__MiniMax__understand_image` tool
+- **Web Search**: When searching for external information, use `mcp__MiniMax__web_search` tool
+
 ## Required Reading
 
 - `docs/maafw_doc/3.1-任务流水线协议.md` - Task Pipeline Protocol (**必读 before adding new features**)
@@ -160,14 +165,39 @@ class ParentInfo:
 
 ## Testing Skills
 
-### Pipeline Testing
+### MaaFW Skill Manuals
 
-When testing Pipeline JSON files, use: `.trae/skills/pipeline-testing.md`
+Use the skill manuals in `.trae/skills/` for developing and testing pipelines:
 
-Key points:
+| Skill | Purpose | Invocation |
+| ----- | ------ | --------- |
+| `maafw-pipelinenode` | Write pipeline nodes, understand recognition/action types, design patterns | Read `.trae/skills/maafw-pipelinenode/SKILL.md` |
+| `pipeline_testing` | Test individual pipeline nodes, verify recognition/action works | Use `/test-pipeline` or read `.trae/skills/pipeline_testing/SKILL.md` |
+| `option-pipeline` | Design interface.json options (select/switch/input/checkbox) | Read `.trae/skills/option-pipeline/SKILL.md` |
 
-- Connect device first (ADB or Window)
-- Use `run_pipeline` with correct paths
-- **DO NOT click confirm** on resource-consuming actions (upgrades, offerings, purchases)
-- Use `BackButton_500ms` (main_ui.json) as reliable return
-- Record results in test summary format
+### Pipeline Testing Workflow
+
+1. **Connect device**
+
+   ```python
+   find_adb_device_list()  # or find_window_list()
+   connect_adb_device(device_name="xxx")  # or connect_window()
+   ```
+
+2. **Read pipeline file**
+   ```python
+   load_pipeline(pipeline_path="<pipeline_json_path>")
+   ```
+
+3. **Test nodes individually**
+   ```python
+   run_pipeline(controller_id=CONTROLLER_ID, pipeline_path=PIPELINE_PATH, entry="node_name", resource_path=RESOURCE_PATH)
+   ```
+
+4. **Analyze results**
+   - `status == "succeeded"` + `all_results` has content = recognition success
+   - `score > 0.9` = reliable match
+
+5. **Resource protection**: NEVER click confirm on upgrades, offerings, purchases, or any resource-consuming actions
+
+6. **Return**: Use `BackButton_500ms` from `main_ui.json` as the most reliable return method
