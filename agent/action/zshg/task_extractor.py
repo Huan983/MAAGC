@@ -93,19 +93,30 @@ class TaskExtractor:
         """
         if not task_names:
             return
-        names = [name.strip() for name in task_names.replace("，", ",").split(",") if name.strip()]
+        names = [
+            name.strip()
+            for name in task_names.replace("，", ",").split(",")
+            if name.strip()
+        ]
         if not names:
             return
 
         # 添加到内存中的黑名单集合
         for name in names:
             cls._task_blacklist_cache.add(name)
-        logger.info(f"动态添加黑名单任务: {names}，当前黑名单共 {len(cls._task_blacklist_cache)} 个")
+        logger.info(
+            f"动态添加黑名单任务: {names}，当前黑名单共 {len(cls._task_blacklist_cache)} 个"
+        )
 
         # 持久化到文件
         try:
             with open(cls._task_blacklist_file_cache, "w", encoding="utf-8") as f:
-                json.dump({"blacklist": list(cls._task_blacklist_cache)}, f, ensure_ascii=False, indent=4)
+                json.dump(
+                    {"blacklist": list(cls._task_blacklist_cache)},
+                    f,
+                    ensure_ascii=False,
+                    indent=4,
+                )
             logger.info(f"黑名单已保存到文件: {cls._task_blacklist_file_cache}")
         except Exception as e:
             logger.error(f"保存黑名单到文件失败: {e}")
@@ -369,16 +380,11 @@ class TaskExtractor:
     def print_task_details(self, tasks: List[TaskInfo]):
         """输出任务详情"""
         for task in tasks:
-            logger.info(f"任务名称: {task.task_name}")
-            logger.info(f"任务描述: {task.task_description}")
+            details = [f"任务名称: {task.task_name}"]
             if task.reward:
-                logger.info(f"奖励: {task.reward}")
+                details.append(f"奖励: {task.reward}")
             if task.time_limit:
-                logger.info(f"时限: {task.time_limit}")
+                details.append(f"时限: {task.time_limit}")
             if task.enemy_level:
-                logger.info(f"敌人等级: {task.enemy_level}")
-            if task.accept_button_box:
-                logger.info(f"接受按钮位置: {task.accept_button_box}")
-            if task.abandon_button_box:
-                logger.info(f"放弃按钮位置: {task.abandon_button_box}")
-            logger.info("-" * 50)
+                details.append(f"敌人等级: {task.enemy_level}")
+            logger.info(" | ".join(details))

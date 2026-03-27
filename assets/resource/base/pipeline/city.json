@@ -296,19 +296,6 @@
             "FightPopUpConfirm"
         ]
     },
-    "FightDefeat": {
-        "recognition": "OCR",
-        "expected": "战斗失败",
-        "roi": [
-            201,
-            86,
-            305,
-            215
-        ],
-        "action": "Click",
-        "post_delay": 500,
-        "timeout": 2000
-    },
     "FightResultLearnSkill": {
         "recognition": "OCR",
         "expected": [

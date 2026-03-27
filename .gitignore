@@ -456,3 +456,4 @@ debug
 .nicegui/
 .vscode/
 .venv/
+.mcp.json

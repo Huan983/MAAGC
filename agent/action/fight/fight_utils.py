@@ -102,14 +102,12 @@ def start_task(context: Context) -> bool:
     Returns:
         bool: 任务执行成功返回 True，否则返回 False
     """
-    logger.info("=== 开始执行任务流程 ===")
 
     if not _preprocess_accept_task(context):
         return False
 
     _process_fight(context)
 
-    logger.info("=== 任务流程执行结束 ===")
     return True
 
 
@@ -251,6 +249,9 @@ def _process_fight(context: Context) -> bool:
     round_count = 0
     max_round_warning = 20
     max_round_stop = 30
+
+    logger.info("战斗中")
+    # 战斗循环
     while True:
         img = context.tasker.controller.post_screencap().wait().get()
         if context.tasker.stopping:
@@ -266,18 +267,18 @@ def _process_fight(context: Context) -> bool:
             break
 
         if round_count >= max_round_stop:
-            logger.error(f"⚠️ 战斗已进行 {round_count} 回合，超过上限，强制停止任务")
+            logger.error(f"战斗已进行 {round_count} 回合，超过上限，强制停止任务")
             context.tasker.post_stop()
             break
 
         if round_count >= max_round_warning:
             logger.warning(
-                f"⚠️ 战斗已进行 {round_count} 回合，可能存在卡顿问题，请检查游戏状态"
+                f"战斗已进行 {round_count} 回合，可能存在卡顿问题，请检查游戏状态"
             )
 
         context.run_task("FightEndRound")
         round_count += 1
-        print(f"\r[info]战斗中，当前{round_count}回合...", flush=True, end="")
+        logger.debug(f"\r[info]战斗中，当前{round_count}回合...")
 
     logger.info(f"战斗结束，共{round_count}回合")
 

@@ -286,12 +286,14 @@
         "timeout": 2000
     },
     "检测_科内塔之怒": {
+        "recognition": "OCR",
         "expected": [
             "koneita"
         ],
         "enabled": false
     },
     "检测_太阳+科内塔之怒": {
+        "recognition": "OCR",
         "expected": [
             "sun_and_koneita"
         ],

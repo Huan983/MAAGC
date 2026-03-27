@@ -12,13 +12,20 @@ def preprocess_events(context: Context) -> bool:
     logger.info("检测随机事件...")
 
     max_iterations = 10
+    no_event_count = 0
     for i in range(max_iterations):
         screenshot = context.tasker.controller.post_screencap().wait().get()
         event_type = detect_and_manage_event(context, screenshot)
 
         if event_type is None:
-            return True
+            no_event_count += 1
+            if no_event_count >= 3:
+                # logger.info("连续3次无事件退出检测")
+                return True
+        else:
+            no_event_count = 0
 
+        time.sleep(0.2)
     return True
 
 
@@ -44,7 +51,6 @@ def _ensure_at_target_city(context: Context, target_city: str) -> tuple:
     )
 
     if reco_detail.hit:
-        logger.info("已在目标城市")
         return True, False
 
     logger.info(f"不在目标城市，开始滑动寻找...")
@@ -132,33 +138,28 @@ def check_current_month(context: Context) -> int:
 
 def handle_festival_by_month(context: Context, month: int) -> bool:
     """根据月份处理节日"""
-    if month == 2:
-        logger.info("本月：祈灵日，跳过")
-        return True
-    elif month == 3:
-        logger.info("本月：启航节")
+    festival_info = {
+        2: "祈灵日，跳过",
+        3: "启航节",
+        5: "春林节，执行相亲",
+        6: "铸魂节，跳过",
+        8: "丰收节",
+        10: "勇士节",
+        11: "亡人节，跳过",
+        12: "创元节，跳过",
+    }
+    festival_name = festival_info.get(month, "无节日")
+    logger.info(f"当前月份：{month}月 - 本月：{festival_name}")
+
+    if month == 3:
         return handle_sailing_festival(context)
     elif month == 5:
-        logger.info("本月：春林节，执行相亲")
         return handle_marry_festival(context)
-    elif month == 6:
-        logger.info("本月：铸魂节，跳过")
-        return True
     elif month == 8:
-        logger.info("本月：丰收节")
         return handle_harvest_festival(context)
     elif month == 10:
-        logger.info("本月：勇士节")
         return handle_warrior_festival(context)
-    elif month == 11:
-        logger.info("本月：亡人节，跳过")
-        return True
-    elif month == 12:
-        logger.info("本月：创元节，跳过")
-        return True
-    else:
-        logger.info("本月：无节日")
-        return True
+    return True
 
 
 def handle_sailing_festival(context: Context) -> bool:
@@ -282,7 +283,6 @@ def process_single_month(context: Context) -> bool:
     if month is None:
         return False
 
-    logger.info(f"当前月份：{month}月")
     handle_festival_by_month(context, month)
 
     fight_utils.start_task(context)
@@ -321,14 +321,19 @@ class YearlyTaskProcessor(CustomAction):
     def run(
         self, context: Context, argv: CustomAction.RunArg
     ) -> CustomAction.RunResult:
-        logger.info("========== 开始年度任务处理 ==========")
+        logger.info("开始年度任务处理")
 
         # 读取用户自定义的任务黑名单
         blacklist_data = context.get_node_data("CustomTaskBlacklist")
         if blacklist_data:
-            custom_blacklist = blacklist_data.get("recognition", {}).get("param", {}).get("expected", [""])[0]
+            custom_blacklist = (
+                blacklist_data.get("recognition", {})
+                .get("param", {})
+                .get("expected", [""])[0]
+            )
             if custom_blacklist:
                 from action.zshg.task_extractor import TaskExtractor
+
                 TaskExtractor.add_to_blacklist(custom_blacklist)
                 logger.info(f"已加载自定义任务黑名单: {custom_blacklist}")
 
@@ -355,11 +360,9 @@ class YearlyTaskProcessor(CustomAction):
             if context.tasker.stopping:
                 logger.info(f"已停止处理第 {month_offset + 1}/{total_months} 个月")
                 break
-            logger.info(
-                f"========== 开始处理第 {month_offset + 1}/{total_months} 个月 =========="
-            )
+            logger.info(f"开始处理第 {month_offset + 1}/{total_months} 个月")
             process_single_month(context)
             time.sleep(3)
 
-        logger.info("========== 年度任务处理完成 ==========")
+        logger.info("年度任务处理完成")
         return CustomAction.RunResult(success=True)
