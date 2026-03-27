@@ -293,7 +293,7 @@
         "post_delay": 500,
         "timeout": 2000,
         "next": [
-            "FightResultConfirm"
+            "FightPopUpConfirm"
         ]
     },
     "FightDefeat": {
