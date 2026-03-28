@@ -26,6 +26,7 @@ class ChatCandidateProfile:
     negative_traits: list[str] = field(default_factory=list)  # 五区劣质特性（哭脸）
     chat_messages: list[MatchmakerMessage] = field(default_factory=list)
     total_score: float = 0.0
+    has_orange_feature: bool = False  # 是否有橙色/金色面部特征（唯一接受标准）
 
 
 class TraitConfig:
@@ -174,11 +175,20 @@ class ChatMatchingDecider:
     def should_accept(
         self, profile: ChatCandidateProfile, threshold: float = None
     ) -> bool:
-        """判断是否接受该对象"""
-        if threshold is None:
-            threshold = self.DEFAULT_THRESHOLD
-        self.calculate_score(profile)
-        return profile.total_score >= threshold
+        """
+        判断是否接受该对象
+
+        唯一标准：是否识别到橙色/金色面部特征
+        橙色特征 = 直接接受（评分1.0）
+        无橙色特征 = 拒绝（评分0.0）
+        """
+        # 有橙色特征则接受
+        if profile.has_orange_feature:
+            profile.total_score = 1.0
+            return True
+        # 无橙色特征则拒绝
+        profile.total_score = 0.0
+        return False
 
     def extract_trait_from_message(
         self, text: str, profile: ChatCandidateProfile, race_country_mapping: dict
@@ -193,7 +203,9 @@ class ChatMatchingDecider:
         - 六区：爵位特性（仅记录，不参与评分）
         """
         # 姓名 提取 (他叫/她叫/他的名字是/她的名字是)
-        name_match = re.search(r"(?:他叫|她叫|他的名字是|她的名字是)([\u4e00-\u9fa5]{1,5})", text)
+        name_match = re.search(
+            r"(?:他叫|她叫|他的名字是|她的名字是)([\u4e00-\u9fa5]{1,5})", text
+        )
         if name_match:
             profile.name = name_match.group(1)
 
@@ -281,11 +293,8 @@ class ChatMatchingDecider:
     def _calculate_trait_score(self, profile: ChatCandidateProfile) -> float:
         """
         计算特性综合评分
-        正面特性 +1，负面特性 -1，归一化到 0-1 范围
-        """
-        score = 0.0
-        score += len(profile.positive_traits)  # 正面特性 +1
-        score -= len(profile.negative_traits)  # 负面特性 -1
 
-        # 归一化：假设最多5个特性，总分范围 -5 到 +5
-        return max(0.0, min((score + 5) / 10.0, 1.0))
+        特性评分已禁用（权重设为0），
+        唯一接受标准是橙色面部特征
+        """
+        return 0.0

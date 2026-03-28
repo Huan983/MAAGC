@@ -60,6 +60,7 @@ class MarryProcessor(CustomAction):
         self._email_current: int = 0  # 当前约会人数
         self._email_total: int = 0  # 最大约会人数
         self._processed_count: int = 0  # 已处理的数量
+        self._current_race: str = ""  # 当前相亲对象种族
         self._reset_state()
         self._init_boxes()
         self._load_blood_names()
@@ -70,6 +71,7 @@ class MarryProcessor(CustomAction):
         self._email_current = 0
         self._email_total = 0
         self._processed_count = 0
+        self._current_race = ""
 
     def _load_blood_names(self) -> None:
         """
@@ -322,9 +324,7 @@ class MarryProcessor(CustomAction):
 
         return True
 
-    def _process_single_candidate(
-        self, context: Context, box: list
-    ) -> None:
+    def _process_single_candidate(self, context: Context, box: list) -> None:
         """处理单个相亲对象"""
         roleBoxCenter = box[0] + box[2] // 2, box[1] + box[3] // 2
         self._processed_count += 1
@@ -342,6 +342,7 @@ class MarryProcessor(CustomAction):
 
         # 3.3 提取血统信息并确定联姻目标
         target_race, target_country = self._evaluate_bloodline_and_get_target(context)
+        self._current_race = target_race  # 记录当前种族，供后续面部特征识别使用
         if not target_country or target_country == "未知":
             logger.warning(f"未识别到联姻国家")
             return
@@ -415,55 +416,69 @@ class MarryProcessor(CustomAction):
             self._execute_high_blood_matching(context, target_race)
 
     def _execute_chat_matching(self, context: Context) -> None:
-        """聊天看相模式：聊天收集信息、决策"""
+        """聊天看相模式：识别橙色特征即接受，无则尝试下一位（每人最多5次）"""
 
-        profile = ChatCandidateProfile()
-        for round_num in range(10):
+        max_attempts = 5  # 每人最多尝试次数
+
+        for attempt in range(1, max_attempts + 1):
             if context.tasker.stopping:
-                break
-            text = self._recognize_matchmaker_speech(context)
-            if text:
-                profile.chat_messages.append(
-                    MatchmakerMessage(round_num + 1, text, time.time())
-                )
-                decider = ChatMatchingDecider()
-                decider.extract_trait_from_message(
-                    text, profile, self.race_country_mapping
-                )
-                logger.info(text[:50])
-            state = self._detect_chat_state_from_text(text)
-            if state == "end":
-                break
-            context.run_task("CastleMarryGetInfoButton")
-        # 决策
-        bloodlines_str = (
-            ", ".join(profile.bloodlines.keys()) if profile.bloodlines else "无"
-        )
-        pos_str = ", ".join(profile.positive_traits) if profile.positive_traits else ""
-        neg_str = ", ".join(profile.negative_traits) if profile.negative_traits else ""
-        if pos_str and neg_str:
-            traits_str = f"特性={pos_str}，{neg_str}"
-        elif pos_str:
-            traits_str = f"特性={pos_str}"
-        else:
-            traits_str = f"特性={neg_str}"
-        decider = ChatMatchingDecider()
-        if decider.should_accept(profile):
-            logger.info(
-                f"接受该相亲对象 (评分 {profile.total_score:.4f}): "
-                f"姓名={profile.name}, 爵位={profile.title}, "
-                f"血脉={bloodlines_str}, {traits_str}"
-            )
-            context.run_task("CastleMarryJustThisButton")
-            context.run_task("PopUpWindowConfirm")
-            self._email_current += 1
-        else:
-            logger.info(
-                f"拒绝该相亲对象 (评分 {profile.total_score:.4f}): "
-                f"姓名={profile.name}, 爵位={profile.title}, "
-                f"血脉={bloodlines_str}, {traits_str}"
-            )
-            context.run_task("CastleMarryLeave")
+                return
+
+            profile = ChatCandidateProfile()
+            profile.name = ""  # 每次尝试重置
+
+            logger.info(f"第 {attempt}/{max_attempts} 次尝试")
+
+            # 聊天循环：收集信息，遇到照片则看脸
+            for round_num in range(10):
+                if context.tasker.stopping:
+                    return
+
+                text = self._recognize_matchmaker_speech(context)
+                if text:
+                    profile.chat_messages.append(
+                        MatchmakerMessage(round_num + 1, text, time.time())
+                    )
+                    decider = ChatMatchingDecider()
+                    decider.extract_trait_from_message(
+                        text, profile, self.race_country_mapping
+                    )
+                    logger.info(text[:50])
+
+                state = self._detect_chat_state_from_text(text)
+                if state == "photo":
+                    self._recognize_face_rating(context, profile)
+                    # 识别到橙色特征，立即接受
+                    if profile.has_orange_feature:
+                        logger.info(
+                            f"第 {attempt} 次尝试识别到橙色特征，接受该相亲对象: "
+                            f"姓名={profile.name}, 爵位={profile.title}"
+                        )
+                        context.run_task("CastleMarryJustThisButton")
+                        context.run_task("PopUpWindowConfirm")
+                        self._email_current += 1
+                        return
+                    else:
+                        # 无橙色特征，尝试下一位
+                        logger.info(
+                            f"第 {attempt} 次尝试无橙色特征，尝试下一位: "
+                            f"姓名={profile.name}"
+                        )
+                        break
+                elif state == "end":
+                    # 未识别到照片就到了结束，直接尝试下一位
+                    logger.info(f"第 {attempt} 次尝试未识别到照片，尝试下一位")
+                    break
+
+                context.run_task("CastleMarryGetInfoButton")
+
+            # 当前尝试结束，尝试下一位
+            if attempt < max_attempts:
+                context.run_task("CastleMarryNextOneButton")
+
+        # 5次都失败，拒绝并离开
+        logger.info(f"经过 {max_attempts} 次尝试均无橙色特征，拒绝该候选人")
+        context.run_task("CastleMarryLeave")
 
     def _execute_high_blood_matching(self, context: Context, target_race: str) -> None:
         """High blood 模式：循环匹配姓名"""
@@ -489,6 +504,34 @@ class MarryProcessor(CustomAction):
         )
         return reco.best_result.text if reco.hit else ""
 
+    def _recognize_face_rating(self, context: Context, profile: "ChatCandidateProfile") -> str:
+        """识别面部特征，设置橙色特征标记"""
+        facial_feature_node = self._get_facial_feature_node(self._current_race)
+        if facial_feature_node:
+            feature_reco = context.run_recognition(
+                facial_feature_node,
+                context.tasker.controller.post_screencap().wait().get(),
+            )
+            if feature_reco.hit:
+                logger.info(
+                    f"识别到{self._current_race}面部特征: {feature_reco.best_result.text}"
+                )
+                # 橙色特征 = 直接接受
+                profile.has_orange_feature = True
+        else:
+            logger.debug(f"{self._current_race} 面部特征未配置，跳过")
+        return ""
+
+    def _get_facial_feature_node(self, race: str) -> str | None:
+        """获取种族对应的面部特征识别节点"""
+        mapping = {
+            "佩尔弗因王族": "佩尔面部特征_科内塔之怒",
+            "塞宁王族": "塞宁面部特征_太阳之子",
+            "高阶精灵": "精灵面部特征_专注之瞳",
+            # 后续添加更多种族...
+        }
+        return mapping.get(race)
+
     def _detect_chat_state_from_text(self, text: str) -> str:
         """
         根据媒人说话内容判断聊天状态
@@ -511,8 +554,9 @@ class MarryProcessor(CustomAction):
             return "end"
 
         # 照片阶段（过程中的照片信息）
-        if "他的芳容" in text or "他的相貌这样" in text:
-            return "ongoing"
+        photo_keywords = ("芳容", "相貌如此", "面庞")
+        if any(kw in text for kw in photo_keywords):
+            return "photo"
 
         # 默认：正常信息阶段（过程中）
         return "ongoing"

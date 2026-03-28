@@ -14,10 +14,10 @@
         "method": 40,
         "count": 50,
         "roi": [
-            350,
-            84,
-            316,
-            467
+            336,
+            139,
+            333,
+            238
         ]
     },
     "精灵面部特征_上古灵性": {
@@ -29,11 +29,50 @@
         ],
         "expected": 1,
         "roi": [
-            501,
-            84,
-            105,
-            124
+            336,
+            139,
+            333,
+            238
         ],
+        "timeout": 2000
+    },
+    "塞宁面部特征_太阳之子": {
+        "recognition": "ColorMatch",
+        "upper": [
+            23,
+            137,
+            211
+        ],
+        "lower": [
+            15,
+            102,
+            13
+        ],
+        "method": 40,
+        "count": 5000,
+        "roi": [
+            336,
+            139,
+            333,
+            238
+        ],
+        "timeout": 2000
+    },
+    "佩尔面部特征_科内塔之怒": {
+        "recognition": "NeuralNetworkDetect",
+        "model": "conetta.onnx",
+        "labels": [
+            "eyebrow_forked",
+            "eyebrow_smooth"
+        ],
+        "expected": 0,
+        "roi": [
+            336,
+            139,
+            333,
+            238
+        ],
+        "threshold": 0.6,
         "timeout": 2000
     }
 }
