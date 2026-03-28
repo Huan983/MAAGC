@@ -1,7 +1,7 @@
 {
     "EnterCity": {
         "recognition": "OCR",
-        "expected": "雄月城",
+        "expected": "圣盾堡",
         "roi": [
             58,
             320,
@@ -364,12 +364,7 @@
         ],
         "action": "Click",
         "post_delay": 1000,
-        "timeout": 2000,
-        "next": [
-            "FightResultReceiveReward",
-            "[JumpBack]FightReusltSkillUp",
-            "[JumpBack]FightReusltLevelUp"
-        ]
+        "timeout": 2000
     },
     "FightReusltSkillUp": {
         "recognition": "OCR",
@@ -429,5 +424,14 @@
         ],
         "post_delay": 1000,
         "timeout": 2000
+    },
+    "FightResult_ReturnBigMap": {
+        "recognition": "DirectHit",
+        "next": [
+            "FightResultReceiveReward",
+            "[JumpBack]FightResultConfirm",
+            "[JumpBack]FightReusltSkillUp",
+            "[JumpBack]FightReusltLevelUp"
+        ]
     }
 }

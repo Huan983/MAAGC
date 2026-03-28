@@ -255,15 +255,15 @@ def _process_fight(context: Context) -> bool:
     while True:
         img = context.tasker.controller.post_screencap().wait().get()
         if context.tasker.stopping:
-            logger.info(f"\n战斗中，已停止")
+            logger.info(f"战斗中，已停止")
             break
         if context.run_recognition("FightFail", img).hit:
             context.run_task("FightFail")
-            logger.info("\n战斗失败")
+            logger.info("战斗失败")
             break
         if context.run_recognition("FightVictory", img).hit:
             context.run_task("FightVictory")
-            logger.info(f"\n战斗胜利（{round_count}回合）")
+            logger.info(f"战斗胜利（{round_count}回合）")
             break
 
         if round_count >= max_round_stop:
@@ -278,7 +278,7 @@ def _process_fight(context: Context) -> bool:
 
         context.run_task("FightEndRound")
         round_count += 1
-        logger.debug(f"\r[info]战斗中，当前{round_count}回合...")
+        logger.debug(f"战斗中，当前{round_count}回合...")
 
     logger.info(f"战斗结束，共{round_count}回合")
 
@@ -297,6 +297,6 @@ def _process_fight(context: Context) -> bool:
         context.run_task("FightPopUp")
 
     # 结束确认
-    context.run_task("FightResultConfirm")
+    context.run_task("FightResult_ReturnBigMap")
 
     return True
