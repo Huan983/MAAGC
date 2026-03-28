@@ -457,3 +457,4 @@ debug
 .vscode/
 .venv/
 .mcp.json
+.claude
