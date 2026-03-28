@@ -7,6 +7,9 @@ from utils import logger
 import re
 import time
 import json
+import os
+import numpy as np
+from PIL import Image
 
 
 @AgentServer.custom_action("DailyTaskProcessor")
@@ -43,5 +46,28 @@ class DailyTaskProcessor(CustomAction):
             context.run_task(task_entry)
             logger.info(f"任务执行完成 {task_entry}")
             context.run_task("UI_ReturnBigMap")
+
+        return CustomAction.RunResult(success=True)
+
+
+@AgentServer.custom_action("TestFunc")
+class TestFunc(CustomAction):
+    """
+    测试函数
+    """
+
+    def run(
+        self, context: Context, argv: CustomAction.RunArg
+    ) -> CustomAction.RunResult:
+
+        # 测试用：载入本地图片
+        local_image_path = os.path.join("1.jpg")
+        pil_image = Image.open(local_image_path)
+        image = np.array(pil_image)
+
+        context.run_recognition(
+            "塞宁面部特征_太阳之子",
+            image,
+        )
 
         return CustomAction.RunResult(success=True)

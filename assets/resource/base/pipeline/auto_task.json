@@ -48,14 +48,14 @@
         "recognition": "OCR",
         "enabled": true,
         "expected": [
-            "24"
+            "12"
         ]
     },
     "CustomTaskBlacklist": {
-        "recognition": "DirectHit",
-        "param": {
-            "expected": [""]
-        }
+        "recognition": "OCR",
+        "expected": [
+            ""
+        ]
     },
     "Auto_MarryTask": {
         "recognition": "DirectHit",
@@ -80,5 +80,13 @@
         "custom_action": "DailyTaskProcessor",
         "post_delay": 500,
         "timeout": 3000
+    },
+    "Auto_TestFunc": {
+        "recognition": "DirectHit",
+        "action": "Custom",
+        "custom_action": "TestFunc",
+        "post_delay": 500,
+        "timeout": 3000,
+        "enabled": true
     }
 }
