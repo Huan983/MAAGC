@@ -440,28 +440,6 @@
         "expected": [],
         "timeout": 3000
     },
-    "CastleMarryFaceRating": {
-        "attach": {
-            "description": "聊天看相-识别颜值评价"
-        },
-        "recognition": "OCR",
-        "roi": [
-            300,
-            500,
-            350,
-            200
-        ],
-        "expected": [
-            "很萌",
-            "还行",
-            "一般",
-            "普通",
-            "好看",
-            "不错",
-            "漂亮"
-        ],
-        "timeout": 2000
-    },
     "MarryModeSelect": {
         "attach": {
             "description": "联姻模式选择"
