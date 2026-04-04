@@ -1,9 +1,4 @@
 {
-    "test_func": {
-        "action": "Custom",
-        "custom_action": "test_func",
-        "timeout": 2000
-    },
     "StartCityTask": {
         "next": [
             "OpenCityTaskPanel"

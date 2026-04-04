@@ -361,12 +361,3 @@ class YearlyTaskProcessor(CustomAction):
 
         logger.info("年度任务处理完成")
         return CustomAction.RunResult(success=True)
-
-
-@AgentServer.custom_action("FightTestFunc")
-class FightTestFunc(CustomAction):
-    def run(
-        self, context: Context, argv: CustomAction.RunArg
-    ) -> CustomAction.RunResult:
-        fight_utils.start_task(context)
-        return CustomAction.RunResult(success=True)
