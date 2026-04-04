@@ -92,6 +92,10 @@ def detect_and_manage_event(context: Context, screenshot) -> str:
         logger.info("检测到佣兵生娃事件")
         context.run_task("Auto_PannelCheck")
         return "mercenary_baby"
+    elif context.run_recognition("事件_孩子夭折了", screenshot).hit:
+        logger.info("检测到孩子夭折事件")
+        context.run_task("事件_孩子夭折了")
+        return "child_death"
     elif context.run_recognition("Event_HarvestFestival", screenshot).hit:
         logger.info("检测到丰收节事件")
         context.run_task("Event_HarvestFestivalDealWith")
