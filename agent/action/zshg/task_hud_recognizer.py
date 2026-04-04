@@ -312,10 +312,10 @@ class TaskHudRecognizer:
             )
             task_list.append(task_info)
 
-        # 3. 打印所有任务信息
+        # 3. 记录所有任务信息（调试用）
         for task in task_list:
             level = self._parse_level(task.task_level)
-            logger.info(
+            logger.debug(
                 f"任务: {task.task_name} | {task.task_type} | {level}级 | {task.task_description}"
             )
 
@@ -327,7 +327,7 @@ class TaskHudRecognizer:
         # 5. 返回等级最高的符合条件的任务
         best = max(filtered, key=lambda t: self._parse_level(t.task_level))
         level = self._parse_level(best.task_level)
-        logger.info(f"选择任务: {best.task_name} | {best.task_type} | {level}级")
+        logger.info(f"选择任务: {best.task_name} | {best.task_type} | {level}级 | {best.task_description}")
         return best
 
     def _filter_tasks(

@@ -171,9 +171,6 @@ def _accept_new_task(context: Context) -> bool:
             # accept_box 是 [x, y, w, h] 列表
             accept_x = accept_box[0] + accept_box[2] // 2
             accept_y = accept_box[1] + accept_box[3] // 2
-            logger.debug(
-                f"HUD识别到任务: {best_task.task_name} ({best_task.task_type}), 点击接受按钮 ({accept_x}, {accept_y})"
-            )
             context.tasker.controller.post_click(accept_x, accept_y).wait()
             time.sleep(0.5)
             return True
