@@ -13,8 +13,8 @@
         ],
         "timeout": 2000,
         "next": [
-            "Event_MercenaryJoinCancel",
-            "Event_MercenaryJoinConfirm"
+            "Event_MercenaryJoinConfirm",
+            "Event_MercenaryJoinCancel"
         ]
     },
     "Event_MercenaryJoinCancel": {
@@ -489,7 +489,8 @@
     "Event_MercenarieRetire": {
         "recognition": "OCR",
         "expected": [
-            "我觉得很累了"
+            "我觉得累了",
+            "累了"
         ],
         "roi": [
             123,
