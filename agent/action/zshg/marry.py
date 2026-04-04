@@ -11,6 +11,9 @@ import json
 import os
 from pathlib import Path
 
+# 使用 PIL 保存 RGB 格式
+from PIL import Image
+
 from .role_utils import (
     extract_potential,
     extract_bloodlines,
@@ -504,15 +507,58 @@ class MarryProcessor(CustomAction):
         )
         return reco.best_result.text if reco.hit else ""
 
-    def _recognize_face_rating(self, context: Context, profile: "ChatCandidateProfile") -> str:
-        """识别面部特征，设置橙色特征标记"""
+    def _save_face_screenshot(self, screenshot, race: str = None) -> str:
+        """保存面部特征识别截图到本地，按种族分文件夹
+
+        Args:
+            screenshot: 截图数组（numpy array）
+            race: 种族名称，默认使用 self._current_race
+        """
+        try:
+            # Windows 兼容的时间戳格式
+            timestamp = time.strftime("%Y%m%d_%H%M%S") + f"_{int(time.time() * 1000) % 1000:03d}"
+
+            race_folder = (
+                race
+                if race
+                else (self._current_race if self._current_race else "unknown")
+            )
+            save_dir = Path("debug_faces") / race_folder
+            save_dir.mkdir(parents=True, exist_ok=True)
+            filename = f"{timestamp}.png"
+            filepath = save_dir / filename
+
+            # BGR 转 RGB
+            rgb_screenshot = screenshot[:, :, ::-1]
+            Image.fromarray(rgb_screenshot).save(filepath)
+            logger.debug(f"截图已保存: {filepath}")
+            return str(filepath)
+        except Exception as e:
+            logger.warning(f"保存截图失败: {e}")
+            return ""
+
+    def _recognize_face_rating(
+        self, context: Context, profile: "ChatCandidateProfile"
+    ) -> str:
+        """识别面部特征，设置橙色特征标记
+
+        crop_roi: [x, y, width, height] = [336, 139, 330, 240]
+        """
         facial_feature_node = self._get_facial_feature_node(self._current_race)
         if facial_feature_node:
+            img = context.tasker.controller.post_screencap().wait().get()
+
+            # 裁剪面部区域 [x, y, width, height] 图片
+            crop_roi = [336, 139, 330, 240]
+            x, y, w, h = crop_roi
+            crop_img = img[y : y + h, x : x + w]
+            self._save_face_screenshot(crop_img, self._current_race)
+
             feature_reco = context.run_recognition(
                 facial_feature_node,
-                context.tasker.controller.post_screencap().wait().get(),
+                crop_img,
             )
-            if feature_reco.hit:
+            if feature_reco and feature_reco.hit:
                 logger.info(
                     f"识别到{self._current_race}面部特征: {feature_reco.best_result.text}"
                 )
