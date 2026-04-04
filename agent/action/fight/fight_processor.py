@@ -324,7 +324,7 @@ class YearlyTaskProcessor(CustomAction):
         logger.info("开始年度任务处理")
 
         # 读取用户自定义的任务黑名单
-        blacklist_data = context.get_node_data("CustomTaskBlacklist")
+        blacklist_data: dict = context.get_node_data("CustomTaskBlacklist")
         if blacklist_data:
             custom_blacklist = (
                 blacklist_data.get("recognition", {})

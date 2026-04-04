@@ -259,11 +259,11 @@ def _process_fight(context: Context) -> bool:
             break
         if context.run_recognition("FightFail", img).hit:
             context.run_task("FightFail")
-            logger.info("战斗失败")
+            logger.info(f"战斗失败{round_count}回合")
             break
         if context.run_recognition("FightVictory", img).hit:
             context.run_task("FightVictory")
-            logger.info(f"战斗胜利（{round_count}回合）")
+            logger.info(f"战斗胜利{round_count}回合")
             break
 
         if round_count >= max_round_stop:
@@ -279,8 +279,6 @@ def _process_fight(context: Context) -> bool:
         context.run_task("FightEndRound")
         round_count += 1
         logger.debug(f"战斗中，当前{round_count}回合...")
-
-    logger.info(f"战斗结束，共{round_count}回合")
 
     # 检测升级技能
     while context.run_recognition(
