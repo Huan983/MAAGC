@@ -57,6 +57,23 @@ class MarryProcessor(CustomAction):
             "瑞格王室": "瑞格王室",
             "黑暗精灵": "黑暗精灵",
         }
+        self.fuzzy_mapping = {
+            "祖扎": ("祖扎尔达王族", "加尔提斯商会"),
+            "瓦诺": ("瓦诺遗族", "加尔提斯商会"),
+            "萨尼": ("萨尼德罕", "加尔提斯商会"),
+            "宏朝": ("宏朝贵胄", "加尔提斯商会"),
+            "精灵": ("高阶精灵", "森之祈愿"),
+            "法拉": ("法拉希尔血裔", "森之祈愿"),
+            "弗莱": ("弗莱德里王族", "弗莱德里王族"),
+            "古特": ("古特雅尔", "北地自由民"),
+            "切瓦利": ("切瓦利王族", "切瓦利王族"),
+            "佩尔": ("佩尔弗因王族", "佩尔弗因王族"),
+            "希尔": ("希尔王族", "希尔王族"),
+            "塞宁": ("塞宁王族", "塞宁王族"),
+            "玛夏": ("玛夏贵族", "玛夏审判军"),
+            "瑞格": ("瑞格王室", "瑞格王室"),
+            "黑暗": ("黑暗精灵", "黑暗精灵"),
+        }
         # 联姻状态属性
         self._mode: str = "high_blood"  # 联姻模式
         self._objects_count: int = 0  # 相亲对象总数量
@@ -516,7 +533,10 @@ class MarryProcessor(CustomAction):
         """
         try:
             # Windows 兼容的时间戳格式
-            timestamp = time.strftime("%Y%m%d_%H%M%S") + f"_{int(time.time() * 1000) % 1000:03d}"
+            timestamp = (
+                time.strftime("%Y%m%d_%H%M%S")
+                + f"_{int(time.time() * 1000) % 1000:03d}"
+            )
 
             race_folder = (
                 race
@@ -669,30 +689,13 @@ class MarryProcessor(CustomAction):
         Returns:
             (种族名称, 国家名称) 元组
         """
-        fuzzy_mapping = {
-            "祖扎": ("祖扎尔达王族", "加尔提斯商会"),
-            "瓦诺": ("瓦诺遗族", "加尔提斯商会"),
-            "萨尼": ("萨尼德罕", "加尔提斯商会"),
-            "宏朝": ("宏朝贵胄", "加尔提斯商会"),
-            "精灵": ("高阶精灵", "森之祈愿"),
-            "法拉": ("法拉希尔血裔", "森之祈愿"),
-            "弗莱": ("弗莱德里王族", "弗莱德里王族"),
-            "古特": ("古特雅尔", "北地自由民"),
-            "切瓦利": ("切瓦利王族", "切瓦利王族"),
-            "佩尔": ("佩尔弗因王族", "佩尔弗因王族"),
-            "希尔": ("希尔王族", "希尔王族"),
-            "塞宁": ("塞宁王族", "塞宁王族"),
-            "玛夏": ("玛夏贵族", "玛夏审判军"),
-            "瑞格": ("瑞格王室", "瑞格王室"),
-            "黑暗": ("黑暗精灵", "黑暗精灵"),
-        }
 
         if bloodline in self.race_country_mapping:
             race = bloodline
             country = self.race_country_mapping[bloodline]
             return race, country
 
-        for keyword, (race, country) in fuzzy_mapping.items():
+        for keyword, (race, country) in self.fuzzy_mapping.items():
             if keyword in bloodline:
                 return race, country
 
@@ -717,13 +720,19 @@ class MarryProcessor(CustomAction):
             if name in high_blood_races
         }
 
-        if not high_blood_bloodlines:
-            return "未知"
+        if high_blood_bloodlines:
+            sorted_bloodlines = sorted(
+                high_blood_bloodlines.items(), key=lambda x: x[1], reverse=True
+            )
+            return sorted_bloodlines[0][0]
 
-        sorted_bloodlines = sorted(
-            high_blood_bloodlines.items(), key=lambda x: x[1], reverse=True
-        )
-        return sorted_bloodlines[0][0]
+        # 模糊匹配 fallback：OCR 可能有字形错误，如"宏朝贵胃"应为"宏朝贵胄"
+        for ocr_name, _ in bloodline.bloodlines.items():
+            for keyword in self.fuzzy_mapping.keys():
+                if keyword in ocr_name:
+                    return ocr_name  # 返回原始OCR名称，让 _get_marriage_info 处理
+
+        return "未知"
 
 
 @AgentServer.custom_action("WeddingProcessor")
