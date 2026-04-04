@@ -4,7 +4,7 @@ from maa.custom_action import CustomAction
 import time
 
 from utils import logger
-from action.zshg.task_extractor import TaskExtractor
+from action.zshg.task_hud_recognizer import TaskHudRecognizer
 
 
 def Map_CheckCurrentMonth(context: Context) -> int:
@@ -130,8 +130,8 @@ def _preprocess_accept_task(context: Context) -> bool:
         return True
 
     # 左右滑动会快速锁定当前任务城市的主城
-    context.run_task("Map_MoveMainCityLeft")
-    context.run_task("Map_MoveMainCityRight")
+    # context.run_task("Map_MoveMainCityLeft")
+    # context.run_task("Map_MoveMainCityRight")
     context.run_task("OpenCityTaskPanel")
     if context.run_recognition(
         "InTaskPannel", context.tasker.controller.post_screencap().wait().get()
@@ -143,7 +143,7 @@ def _preprocess_accept_task(context: Context) -> bool:
 
 def _accept_new_task(context: Context) -> bool:
     """
-    接取新任务
+    接取新任务 - 默认使用HUD动态识别模式
 
     Args:
         context: MAA 上下文对象
@@ -154,60 +154,40 @@ def _accept_new_task(context: Context) -> bool:
     max_swipe_times = 5
     swipe_count = 0
 
-    # 使用单例模式的TaskExtractor，不会重复初始化
-    extractor = TaskExtractor(roi=[15, 382, 697, 841])
+    # HUD动态识别器 - 默认筛选阈值 120级以下
+    hud_recognizer = TaskHudRecognizer()
+    hud_max_level = 120
 
     while swipe_count <= max_swipe_times:
-        reco_detail = context.run_recognition(
-            "GetCityTaskDetails",
-            context.tasker.controller.post_screencap().wait().get(),
-            pipeline_override={
-                "GetCityTaskDetails": {
-                    "recognition": "OCR",
-                    "expected": ["接受"],
-                    "roi": [15, 382, 697, 841],
-                }
-            },
+        screenshot = context.tasker.controller.post_screencap().wait().get()
+
+        # 优先使用HUD动态识别器识别任务
+        best_task = hud_recognizer.recognize_and_get_best_task(
+            context, screenshot, max_level=hud_max_level
         )
 
-        tasks = []
-        if reco_detail.hit:
-            tasks = extractor.extract_tasks(reco_detail.all_results)
+        if best_task and best_task.accept_button_box:
+            accept_box = best_task.accept_button_box
+            # accept_box 是 [x, y, w, h] 列表
+            accept_x = accept_box[0] + accept_box[2] // 2
+            accept_y = accept_box[1] + accept_box[3] // 2
+            logger.debug(
+                f"HUD识别到任务: {best_task.task_name} ({best_task.task_type}), 点击接受按钮 ({accept_x}, {accept_y})"
+            )
+            context.tasker.controller.post_click(accept_x, accept_y).wait()
+            time.sleep(0.5)
+            return True
 
-        if tasks:
-            extractor.print_task_details([tasks[0]])
-            accept_task = tasks[0]
-            accept_task_rect = accept_task.accept_button_box
-            if accept_task_rect:
-                accept_task_rect_x, accept_task_rect_y = (
-                    accept_task_rect.x + accept_task_rect.w // 2,
-                    accept_task_rect.y + accept_task_rect.h // 2,
-                )
-                context.tasker.controller.post_click(
-                    accept_task_rect_x, accept_task_rect_y
-                ).wait()
-                time.sleep(0.5)
-                return True
-            else:
-                if swipe_count < max_swipe_times:
-                    logger.info(
-                        f"找到任务但未找到接受按钮，正在滑动刷新... ({swipe_count + 1}/{max_swipe_times})"
-                    )
-                    context.run_task("FindCityTask_SwipeDown")
-                    swipe_count += 1
-                else:
-                    logger.error("已尝试多次刷新，未检测到可接取的任务的接受按钮")
-                    return False
+        # HUD识别失败，滑动刷新
+        if swipe_count < max_swipe_times:
+            logger.info(
+                f"HUD未识别到有效任务，正在滑动刷新... ({swipe_count + 1}/{max_swipe_times})"
+            )
+            context.run_task("FindCityTask_SwipeDown")
+            swipe_count += 1
         else:
-            if swipe_count < max_swipe_times:
-                logger.info(
-                    f"当前页面任务全在黑名单或无任务，正在滑动刷新... ({swipe_count + 1}/{max_swipe_times})"
-                )
-                context.run_task("FindCityTask_SwipeDown")
-                swipe_count += 1
-            else:
-                logger.error("已尝试多次刷新，未检测到可接取的任务")
-                return False
+            logger.error("HUD识别多次失败，未检测到可接取的任务")
+            return False
 
     return False
 

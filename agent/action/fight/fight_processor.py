@@ -311,15 +311,6 @@ class TaskProcessor(CustomAction):
         return CustomAction.RunResult(success=True)
 
 
-@AgentServer.custom_action("FightTestFunc")
-class FightTestFunc(CustomAction):
-    def run(
-        self, context: Context, argv: CustomAction.RunArg
-    ) -> CustomAction.RunResult:
-        fight_utils.start_task(context)
-        return CustomAction.RunResult(success=True)
-
-
 @AgentServer.custom_action("YearlyTaskProcessor")
 class YearlyTaskProcessor(CustomAction):
     def run(
@@ -336,9 +327,9 @@ class YearlyTaskProcessor(CustomAction):
                 .get("expected", [""])[0]
             )
             if custom_blacklist:
-                from action.zshg.task_extractor import TaskExtractor
+                from action.zshg.task_hud_recognizer import TaskBlacklist
 
-                TaskExtractor.add_to_blacklist(custom_blacklist)
+                TaskBlacklist.add_to_blacklist(custom_blacklist)
                 logger.info(f"已加载自定义任务黑名单: {custom_blacklist}")
 
         if not fight_utils.ensure_at_bigmap(context):
@@ -369,4 +360,13 @@ class YearlyTaskProcessor(CustomAction):
             time.sleep(3)
 
         logger.info("年度任务处理完成")
+        return CustomAction.RunResult(success=True)
+
+
+@AgentServer.custom_action("FightTestFunc")
+class FightTestFunc(CustomAction):
+    def run(
+        self, context: Context, argv: CustomAction.RunArg
+    ) -> CustomAction.RunResult:
+        fight_utils.start_task(context)
         return CustomAction.RunResult(success=True)
