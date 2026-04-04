@@ -557,23 +557,23 @@ class MarryProcessor(CustomAction):
             logger.warning(f"保存截图失败: {e}")
             return ""
 
-    def _recognize_face_rating(
-        self, context: Context, profile: "ChatCandidateProfile"
-    ) -> str:
+    def _recognize_face_rating(self, context: Context, profile: "ChatCandidateProfile"):
         """识别面部特征，设置橙色特征标记
 
         crop_roi: [x, y, width, height] = [336, 139, 330, 240]
         """
+        img = context.tasker.controller.post_screencap().wait().get()
+
+        # 裁剪面部区域 [x, y, width, height] 图片
+        crop_roi = [336, 139, 330, 240]
+        x, y, w, h = crop_roi
+        crop_img = img[y : y + h, x : x + w]
+        # 总是保存截图，用于训练数据收集
+        self._save_face_screenshot(crop_img, self._current_race)
+
+        # 只有配置了面部特征节点的种族才进行特征识别
         facial_feature_node = self._get_facial_feature_node(self._current_race)
         if facial_feature_node:
-            img = context.tasker.controller.post_screencap().wait().get()
-
-            # 裁剪面部区域 [x, y, width, height] 图片
-            crop_roi = [336, 139, 330, 240]
-            x, y, w, h = crop_roi
-            crop_img = img[y : y + h, x : x + w]
-            self._save_face_screenshot(crop_img, self._current_race)
-
             feature_reco = context.run_recognition(
                 facial_feature_node,
                 crop_img,
@@ -584,9 +584,8 @@ class MarryProcessor(CustomAction):
                 )
                 # 橙色特征 = 直接接受
                 profile.has_orange_feature = True
-        else:
-            logger.debug(f"{self._current_race} 面部特征未配置，跳过")
-        return ""
+                return True
+        return False
 
     def _get_facial_feature_node(self, race: str) -> str | None:
         """获取种族对应的面部特征识别节点"""
