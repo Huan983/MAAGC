@@ -432,6 +432,7 @@
             "[JumpBack]FightResultConfirm",
             "[JumpBack]FightReusltSkillUp",
             "[JumpBack]FightReusltLevelUp"
-        ]
+        ],
+        "timeout": 3000
     }
 }
