@@ -77,10 +77,13 @@ class MarryProcessor(CustomAction):
         # 联姻状态属性
         self._mode: str = "high_blood"  # 联姻模式
         self._objects_count: int = 0  # 相亲对象总数量
-        self._email_current: int = 0  # 当前约会人数
+        self._email_current: int = 0  # 当前已约会人数（已接受）
         self._email_total: int = 0  # 最大约会人数
         self._processed_count: int = 0  # 已处理的数量
         self._current_race: str = ""  # 当前相亲对象种族
+        self._current_max_attempts: int = 5  # 当前候选人的最大尝试次数
+        self._total_candidates: int = 0  # 候选对象总人数
+        self._candidate_index: int = 0  # 当前处理到第几个候选人（0开始）
         self._reset_state()
         self._init_boxes()
         self._load_blood_names()
@@ -92,6 +95,9 @@ class MarryProcessor(CustomAction):
         self._email_total = 0
         self._processed_count = 0
         self._current_race = ""
+        self._current_max_attempts = 5
+        self._total_candidates = 0
+        self._candidate_index = 0
 
     def _load_blood_names(self) -> None:
         """
@@ -321,6 +327,9 @@ class MarryProcessor(CustomAction):
             f"对象总数: {self._objects_count}"
         )
 
+        self._total_candidates = len(candidates)
+        self._candidate_index = 0
+
         for row_idx, col_idx, box in candidates:
             if context.tasker.stopping:
                 logger.info("相亲任务已停止")
@@ -367,10 +376,21 @@ class MarryProcessor(CustomAction):
             logger.warning(f"未识别到联姻国家")
             return
 
+        # 计算当前候选人的最大尝试次数（向上取整均分）
+        # 例：15次 / 4人 = 每人4次
+        self._current_max_attempts = max(
+            1, (self._objects_count + self._total_candidates - 1) // self._total_candidates
+        )
+        logger.debug(
+            f"候选人序号: {self._candidate_index + 1}/{self._total_candidates}，"
+            f"对象总数: {self._objects_count}，本次最大尝试次数: {self._current_max_attempts}"
+        )
+
         # 3.4 进入正式相亲页面进行匹配
         self._execute_marriage_matching(context, target_race, target_country)
 
         logger.info(f"完成第{self._processed_count}个角色的处理")
+        self._candidate_index += 1
 
     def _enter_role_details(self, context: Context, roleBoxCenter: tuple) -> None:
         """点击角色并长按进入详情界面"""
@@ -436,9 +456,9 @@ class MarryProcessor(CustomAction):
             self._execute_high_blood_matching(context, target_race)
 
     def _execute_chat_matching(self, context: Context) -> None:
-        """聊天看相模式：识别橙色特征即接受，无则尝试下一位（每人最多5次）"""
+        """聊天看相模式：识别橙色特征即接受，无则尝试下一位"""
 
-        max_attempts = 5  # 每人最多尝试次数
+        max_attempts = self._current_max_attempts
 
         for attempt in range(1, max_attempts + 1):
             if context.tasker.stopping:
@@ -512,7 +532,9 @@ class MarryProcessor(CustomAction):
         match_found = self._match_name_in_loop(context, target_names, target_race)
 
         if not match_found:
-            logger.warning(f"经过5次尝试，仍未找到匹配的姓名")
+            logger.warning(
+                f"经过 {self._current_max_attempts} 次尝试，仍未找到匹配的姓名"
+            )
             context.run_task("PopUpWindowCancel")
             context.run_task("CastleMarryLeave")
 
@@ -580,7 +602,7 @@ class MarryProcessor(CustomAction):
             )
             if feature_reco and feature_reco.hit:
                 logger.info(
-                    f"识别到{self._current_race}面部特征: {feature_reco.best_result.text}"
+                    f"识别到{self._current_race}面部特征: {feature_reco.best_result.text}, 分数: {feature_reco.best_result.score}"
                 )
                 # 橙色特征 = 直接接受
                 profile.has_orange_feature = True
@@ -630,7 +652,7 @@ class MarryProcessor(CustomAction):
         self, context: Context, target_names: list, target_race: str
     ) -> bool:
         """循环匹配姓名，直到找到匹配的或达到最大次数"""
-        max_attempts = 5
+        max_attempts = self._current_max_attempts
 
         for attempt in range(max_attempts):
             logger.info(f"第 {attempt + 1}/{max_attempts} 次尝试匹配姓名")
