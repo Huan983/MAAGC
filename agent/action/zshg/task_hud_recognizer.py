@@ -26,10 +26,6 @@ class TaskBlacklist:
     """任务黑名单单例类"""
 
     _instance = None
-    _initialized = False
-
-    _blacklist_cache = None
-    _blacklist_file_cache = None
 
     def __new__(cls):
         if cls._instance is None:
@@ -37,29 +33,17 @@ class TaskBlacklist:
         return cls._instance
 
     def __init__(self):
-        if TaskBlacklist._initialized:
+        # 使用 getattr 避免 _initialized 不存在的 AttributeError
+        if getattr(self, "_initialized", False):
             return
-        TaskBlacklist._initialized = True
+        self._initialized = True
 
         cwd_dir = os.getcwd()
         logger.debug(f"TaskBlacklist初始化，当前工作目录: {cwd_dir}")
 
         self.blacklist_file = os.path.join(cwd_dir, "table", "task_blacklist.json")
+        self._blacklist_cache = self._load_blacklist()
         logger.debug(f"黑名单文件路径: {self.blacklist_file}")
-
-        self.blacklist = self._get_cached_blacklist()
-
-    def _get_cached_blacklist(self):
-        if (
-            TaskBlacklist._blacklist_cache is None
-            or TaskBlacklist._blacklist_file_cache != self.blacklist_file
-        ):
-            TaskBlacklist._blacklist_file_cache = self.blacklist_file
-            TaskBlacklist._blacklist_cache = self._load_blacklist()
-            logger.debug("黑名单缓存已更新")
-        else:
-            logger.info("使用缓存的黑名单数据")
-        return TaskBlacklist._blacklist_cache
 
     def _load_blacklist(self):
         try:
@@ -76,8 +60,7 @@ class TaskBlacklist:
             logger.error(f"载入黑名单失败: {e}")
             return set()
 
-    @classmethod
-    def add_to_blacklist(cls, task_names: str):
+    def add_to_blacklist(self, task_names: str):
         """动态添加任务名到黑名单（同时持久化到文件）"""
         if not task_names:
             return
@@ -90,26 +73,26 @@ class TaskBlacklist:
             return
 
         for name in names:
-            cls._blacklist_cache.add(name)
+            self._blacklist_cache.add(name)
         logger.info(
-            f"动态添加黑名单任务: {names}，当前黑名单共 {len(cls._blacklist_cache)} 个"
+            f"动态添加黑名单任务: {names}，当前黑名单共 {len(self._blacklist_cache)} 个"
         )
 
         try:
-            with open(cls._blacklist_file_cache, "w", encoding="utf-8") as f:
+            with open(self.blacklist_file, "w", encoding="utf-8") as f:
                 json.dump(
-                    {"blacklist": list(cls._blacklist_cache)},
+                    {"blacklist": list(self._blacklist_cache)},
                     f,
                     ensure_ascii=False,
                     indent=4,
                 )
-            logger.info(f"黑名单已保存到文件: {cls._blacklist_file_cache}")
+            logger.info(f"黑名单已保存到文件: {self.blacklist_file}")
         except Exception as e:
             logger.error(f"保存黑名单到文件失败: {e}")
 
     def is_in_blacklist(self, task_name: str) -> bool:
         """检查任务是否在黑名单中"""
-        return task_name in self.blacklist
+        return task_name in self._blacklist_cache
 
 
 class TaskHudRecognizer:

@@ -329,7 +329,7 @@ class YearlyTaskProcessor(CustomAction):
             if custom_blacklist:
                 from action.zshg.task_hud_recognizer import TaskBlacklist
 
-                TaskBlacklist.add_to_blacklist(custom_blacklist)
+                TaskBlacklist().add_to_blacklist(custom_blacklist)
                 logger.info(f"已加载自定义任务黑名单: {custom_blacklist}")
 
         if not fight_utils.ensure_at_bigmap(context):
