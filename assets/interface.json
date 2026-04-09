@@ -120,8 +120,13 @@
             "description": "识别孩子信息并自动生成名字的工具"
         },
         {
-            "name": "自动相亲",
+            "name": "自动相亲——小工具",
             "entry": "Auto_MarryTask",
+            "option": [
+                "相亲范围",
+                "相亲模式",
+                "相亲种族"
+            ],
             "doc": [
                 "### 自动相亲",
                 "",
@@ -405,9 +410,34 @@
                 }
             }
         },
+        "相亲范围": {
+            "type": "select",
+            "description": "选择是单角色还是多角色相亲",
+            "default_case": "多角色相亲",
+            "cases": [
+                {
+                    "name": "多角色相亲",
+                    "description": "一次检测识别多位角色进行相亲，每个角色平分相亲次数",
+                    "pipeline_override": {
+                        "MarryMultiSelect": {
+                            "expected": "multi"
+                        }
+                    }
+                },
+                {
+                    "name": "单角色相亲",
+                    "description": "一次一位，当前选择角色直接相亲，一人所有次数",
+                    "pipeline_override": {
+                        "MarryMultiSelect": {
+                            "expected": "single"
+                        }
+                    }
+                }
+            ]
+        },
         "相亲模式": {
             "type": "select",
-            "description": "选择要刷取任务的目标城市",
+            "description": "选择相亲模式",
             "default_case": "姓名相亲",
             "cases": [
                 {
@@ -423,6 +453,133 @@
                     "pipeline_override": {
                         "MarryModeSelect": {
                             "expected": "trait"
+                        }
+                    }
+                }
+            ]
+        },
+        "相亲种族": {
+            "type": "select",
+            "description": "选择相亲种族，将会默认找到对应国家",
+            "default_case": "佩尔弗因王族",
+            "cases": [
+                {
+                    "name": "佩尔弗因王族",
+                    "pipeline_override": {
+                        "MarryRaceSelect": {
+                            "expected": "佩尔弗因王族"
+                        }
+                    }
+                },
+                {
+                    "name": "塞宁王族",
+                    "pipeline_override": {
+                        "MarryRaceSelect": {
+                            "expected": "塞宁王族"
+                        }
+                    }
+                },
+                {
+                    "name": "高阶精灵",
+                    "pipeline_override": {
+                        "MarryRaceSelect": {
+                            "expected": "高阶精灵"
+                        }
+                    }
+                },
+                {
+                    "name": "弗莱德里王族",
+                    "pipeline_override": {
+                        "MarryRaceSelect": {
+                            "expected": "弗莱德里王族"
+                        }
+                    }
+                },
+                {
+                    "name": "希尔王族",
+                    "pipeline_override": {
+                        "MarryRaceSelect": {
+                            "expected": "希尔王族"
+                        }
+                    }
+                },
+                {
+                    "name": "切瓦利王族",
+                    "pipeline_override": {
+                        "MarryRaceSelect": {
+                            "expected": "切瓦利王族"
+                        }
+                    }
+                },
+                {
+                    "name": "祖扎尔达王族",
+                    "pipeline_override": {
+                        "MarryRaceSelect": {
+                            "expected": "祖扎尔达王族"
+                        }
+                    }
+                },
+                {
+                    "name": "黑暗精灵",
+                    "pipeline_override": {
+                        "MarryRaceSelect": {
+                            "expected": "黑暗精灵"
+                        }
+                    }
+                },
+                {
+                    "name": "瓦诺遗族",
+                    "pipeline_override": {
+                        "MarryRaceSelect": {
+                            "expected": "瓦诺遗族"
+                        }
+                    }
+                },
+                {
+                    "name": "萨尼德罕",
+                    "pipeline_override": {
+                        "MarryRaceSelect": {
+                            "expected": "萨尼德罕"
+                        }
+                    }
+                },
+                {
+                    "name": "宏朝贵胄",
+                    "pipeline_override": {
+                        "MarryRaceSelect": {
+                            "expected": "宏朝贵胄"
+                        }
+                    }
+                },
+                {
+                    "name": "法拉希尔血裔",
+                    "pipeline_override": {
+                        "MarryRaceSelect": {
+                            "expected": "法拉希尔血裔"
+                        }
+                    }
+                },
+                {
+                    "name": "古特雅尔",
+                    "pipeline_override": {
+                        "MarryRaceSelect": {
+                            "expected": "古特雅尔"
+                        }
+                    }
+                },
+                {
+                    "name": "玛夏贵族",
+                    "pipeline_override": {
+                        "MarryRaceSelect": {
+                            "expected": "玛夏贵族"
+                        }
+                    }
+                },
+                {
+                    "name": "瑞格王室",
+                    "pipeline_override": {
+                        "MarryRaceSelect": {
+                            "expected": "瑞格王室"
                         }
                     }
                 }

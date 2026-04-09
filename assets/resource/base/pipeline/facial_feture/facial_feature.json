@@ -65,12 +65,20 @@
             "eyebrow_forked",
             "eyebrow_smooth"
         ],
-        "expected": 0,
+        "expected": [
+            0
+        ],
         "roi": [
             336,
             139,
             330,
             240
+        ],
+        "target": [
+            111,
+            94,
+            262,
+            246
         ],
         "threshold": 0.6,
         "timeout": 2000

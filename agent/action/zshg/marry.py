@@ -81,6 +81,8 @@ class MarryProcessor(CustomAction):
         self._email_total: int = 0  # 最大约会人数
         self._processed_count: int = 0  # 已处理的数量
         self._current_race: str = ""  # 当前相亲对象种族
+        self._target_race: str = ""  # 目标相亲对象种族
+        self._target_country: str = ""  # 目标相亲对象国家
         self._current_max_attempts: int = 5  # 当前候选人的最大尝试次数
         self._total_candidates: int = 0  # 候选对象总人数
         self._candidate_index: int = 0  # 当前处理到第几个候选人（0开始）
@@ -157,6 +159,19 @@ class MarryProcessor(CustomAction):
         self, context: Context, argv: CustomAction.RunArg
     ) -> CustomAction.RunResult:
         """处理联姻任务主流程"""
+
+        # 检测是否是多角色相亲，还是单角色相亲
+        self._match_scope = self._get_selected_match_scope(context)
+        if self._match_scope == "multi":
+            execute_result = self._multi_plan(context)
+        else:
+            execute_result = self._single_plan(context)
+        return execute_result
+
+    def _multi_plan(self, context: Context) -> CustomAction.RunResult:
+        """
+        执行主流程
+        """
         self._reset_state()  # 重置状态
 
         # 获取并保存用户选择的模式
@@ -169,6 +184,51 @@ class MarryProcessor(CustomAction):
 
         # 正式处理阶段
         self._main_process(context, candidates)
+
+        # 后处理：记录完成日志
+        self._post_process()
+        return CustomAction.RunResult(success=True)
+
+    def _single_plan(self, context: Context) -> CustomAction.RunResult:
+        """
+        执行单个人的相亲流程
+        """
+        logger.info("开始执行单个人的相亲流程")
+        self._reset_state()  # 重置状态
+
+        # 获取并保存用户选择的模式
+        self._mode = self._get_selected_mode(context)
+
+        # 检查联姻资格（界面进入、对象数量、回信数量）
+        if not self._check_marriage_eligibility(context):
+            return None
+
+        # 正式处理阶段
+        self._current_max_attempts = self._objects_count
+
+        # 获取用户选择的相亲种族
+        self._target_race = self._get_selected_race(context)
+        self._target_country = self.race_country_mapping.get(self._target_race, "未知")
+        self._current_race = self._target_race  # 用于面部特征识别
+
+        logger.info(
+            f"选择的相亲种族: {self._target_race}，对应的国家: {self._target_country}"
+        )
+
+        context.run_task(
+            "CastleMarrySelectStart",
+            pipeline_override={
+                "CastleMarrySelectCountry": {"expected": [self._target_country]}
+            },
+        )
+
+        # 执行基于血统的匹配或特征匹配
+        if self._mode == "trait":
+            logger.info("开始执行特征匹配")
+            self._execute_chat_matching(context)
+        else:
+            logger.info(f"开始执行血统匹配，目标种族: {self._target_race}")
+            self._execute_high_blood_matching(context, self._target_race)
 
         # 后处理：记录完成日志
         self._post_process()
@@ -193,6 +253,47 @@ class MarryProcessor(CustomAction):
         )
         logger.info(f"选择的联姻模式: {selected_mode}")
         return selected_mode
+
+    def _get_selected_race(self, context: Context) -> str:
+        """
+        获取用户选择的联姻种族
+
+        通过 option select 类型获取用户选择，
+        使用 context.get_node_data() 从 pipeline 节点中读取 expected 值
+        """
+        race_data = context.get_node_data("MarryRaceSelect")
+        if race_data is None:
+            logger.warning("MarryRaceSelect 节点未定义，使用默认种族")
+            return "佩尔弗因王族"
+
+        selected_race = (
+            race_data.get("recognition", {})
+            .get("param", {})
+            .get("expected", ["佩尔弗因王族"])[0]
+        )
+        logger.info(f"选择的联姻种族: {selected_race}")
+        return selected_race
+
+    def _get_selected_match_scope(self, context: Context) -> bool:
+        """
+        检测用户选择的是多角色相亲还是单角色相亲
+
+        通过 option select 类型获取用户选择，
+        使用 context.get_node_data() 从 pipeline 节点中读取 expected 值
+        """
+        multi_data = context.get_node_data("MarryMultiSelect")
+        if multi_data is None:
+            logger.warning("MarryMultiSelect 节点未定义，使用默认多角色相亲")
+            return True
+
+        selected = (
+            multi_data.get("recognition", {})
+            .get("param", {})
+            .get("expected", ["multi"])[0]
+        )
+        is_multi = selected == "multi"
+        logger.info(f"选择的相亲范围: {'多角色相亲' if is_multi else '单角色相亲'}")
+        return is_multi
 
     # ==================== 前处理阶段 ====================
 
@@ -379,7 +480,9 @@ class MarryProcessor(CustomAction):
         # 计算当前候选人的最大尝试次数（向上取整均分）
         # 例：15次 / 4人 = 每人4次
         self._current_max_attempts = max(
-            1, (self._objects_count + self._total_candidates - 1) // self._total_candidates
+            1,
+            (self._objects_count + self._total_candidates - 1)
+            // self._total_candidates,
         )
         logger.debug(
             f"候选人序号: {self._candidate_index + 1}/{self._total_candidates}，"
@@ -598,15 +701,22 @@ class MarryProcessor(CustomAction):
         if facial_feature_node:
             feature_reco = context.run_recognition(
                 facial_feature_node,
-                crop_img,
+                img,
             )
+            if feature_reco and feature_reco.all_results:
+                for i, result in enumerate(feature_reco.all_results):
+                    logger.info(f"class='{result.label}', score={result.score}")
             if feature_reco and feature_reco.hit:
                 logger.info(
-                    f"识别到{self._current_race}面部特征: {feature_reco.best_result.text}, 分数: {feature_reco.best_result.score}"
+                    f"识别到{self._current_race}面部特征: {facial_feature_node}, 分数: {feature_reco.best_result.score}"
                 )
                 # 橙色特征 = 直接接受
                 profile.has_orange_feature = True
                 return True
+            else:
+                logger.info(f"面部特征识别未命中")
+        else:
+            logger.info(f"当前种族 {self._current_race} 没有配置面部特征识别节点")
         return False
 
     def _get_facial_feature_node(self, race: str) -> str | None:

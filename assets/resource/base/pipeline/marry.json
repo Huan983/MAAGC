@@ -449,5 +449,25 @@
             "trait"
         ],
         "enabled": false
+    },
+    "MarryRaceSelect": {
+        "attach": {
+            "description": "联姻种族选择"
+        },
+        "recognition": "OCR",
+        "expected": [
+            "佩尔弗因王族"
+        ],
+        "enabled": true
+    },
+    "MarryMultiSelect": {
+        "attach": {
+            "description": "联姻模式选择-多角色/单角色"
+        },
+        "recognition": "OCR",
+        "expected": [
+            "multi"
+        ],
+        "enabled": true
     }
 }
