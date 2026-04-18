@@ -3,6 +3,7 @@ from math import log
 from maa.agent.agent_server import AgentServer
 from maa.context import Context
 from maa.custom_action import CustomAction
+from maa.define import NeuralNetworkResult
 from utils import logger
 
 import re
@@ -705,10 +706,17 @@ class MarryProcessor(CustomAction):
             )
             if feature_reco and feature_reco.all_results:
                 for i, result in enumerate(feature_reco.all_results):
-                    logger.info(f"class='{result.label}', score={result.score}")
+                    if isinstance(result, NeuralNetworkResult):
+                        logger.info(
+                            f"result[{i}]: label={result.label}, score={result.score}"
+                        )
+                    else:
+                        logger.info(
+                            f"result[{i}]: box={result.box}, count={result.count}"
+                        )
             if feature_reco and feature_reco.hit:
                 logger.info(
-                    f"识别到{self._current_race}面部特征: {facial_feature_node}, 分数: {feature_reco.best_result.score}"
+                    f"识别到{self._current_race}面部特征: {facial_feature_node}"
                 )
                 # 橙色特征 = 直接接受
                 profile.has_orange_feature = True
