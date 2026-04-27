@@ -3,3 +3,5 @@ import action.fight.fight_processor
 import action.zshg.daily_task
 import action.zshg.child
 import action.zshg.marry
+
+import action.zshg.auto_fight_processor

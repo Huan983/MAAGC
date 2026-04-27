@@ -10,10 +10,8 @@ import re
 import time
 import json
 import os
+import cv2
 from pathlib import Path
-
-# 使用 PIL 保存 RGB 格式
-from PIL import Image
 
 from .role_utils import (
     extract_potential,
@@ -674,9 +672,9 @@ class MarryProcessor(CustomAction):
             filename = f"{timestamp}.png"
             filepath = save_dir / filename
 
-            # BGR 转 RGB
+            # BGR 转 RGB，然后用 cv2 保存
             rgb_screenshot = screenshot[:, :, ::-1]
-            Image.fromarray(rgb_screenshot).save(filepath)
+            cv2.imwrite(str(filepath), rgb_screenshot)
             logger.debug(f"截图已保存: {filepath}")
             return str(filepath)
         except Exception as e:

@@ -1,15 +1,10 @@
-from dataclasses import dataclass
 from maa.agent.agent_server import AgentServer
 from maa.context import Context
 from maa.custom_action import CustomAction
 from utils import logger
 
-import re
-import time
-import json
 import os
-import numpy as np
-from PIL import Image
+import cv2
 
 
 @AgentServer.custom_action("DailyTaskProcessor")
@@ -60,10 +55,10 @@ class TestFunc(CustomAction):
         self, context: Context, argv: CustomAction.RunArg
     ) -> CustomAction.RunResult:
 
-        # 测试用：载入本地图片
+        # 测试用：载入本地图片（cv2 读取为 BGR，转 RGB）
         local_image_path = os.path.join("1.jpg")
-        pil_image = Image.open(local_image_path)
-        image = np.array(pil_image)
+        image = cv2.imread(local_image_path)
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
         context.run_recognition(
             "塞宁面部特征_太阳之子",
