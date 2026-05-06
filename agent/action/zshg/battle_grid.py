@@ -1,4 +1,4 @@
-"""战场网格与单位识别模块 - 通过红色威胁区域推断网格结构，识别单位位置"""
+"""战场网格与单位识别模块 - 重构后结构清晰的数据层、识别层、结构层"""
 
 import os
 import sys
@@ -6,9 +6,7 @@ import cv2
 import numpy as np
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import List, Set, Tuple, Optional
-
-from maa.context import Context
+from typing import List, Tuple, Optional
 
 current_file_path = os.path.abspath(__file__)
 current_script_dir = os.path.dirname(current_file_path)
@@ -23,14 +21,542 @@ if agent_dir not in sys.path:
 from utils import logger
 
 
+# ========================
+# 数据层：Cell + CellRect
+# ========================
+
+
+class CellType(Enum):
+    NONE = "none"
+    SELF = "self"
+    ENEMY = "enemy"
+    FRIEND = "friend"
+
+
+@dataclass
+class CellRect:
+    x: int = 0
+    y: int = 0
+    width: int = 120
+    height: int = 120
+
+    def to_box(self) -> List[int]:
+        return [self.x, self.y, self.width, self.height]
+
+    def center(self) -> Tuple[int, int]:
+        return (self.x + self.width // 2, self.y + self.height // 2)
+
+
+@dataclass
+class Cell:
+    row: int
+    col: int
+    rect: CellRect
+    cell_type: CellType = CellType.NONE
+    have_person: bool = False
+    unit_center: Tuple[int, int] = field(default=(0, 0))  # 单位精确位置（颜色区域中心）
+    is_threat: bool = False
+    is_moveable: bool = False
+    is_attackable: bool = False
+
+
+# ========================
+# 识别层：RecoProcessor
+# ========================
+
+
+class RecoProcessor:
+    """单例识别器：颜色检测、威胁区域、攻击/移动范围"""
+    _instance = None
+
+    PIPELINE_NODES = {
+        "threat": "Battle_ThreatRegion",
+        "ocr": "Battle_UnitScan_OCR",
+        CellType.SELF: "Battle_UnitScan_Blue",
+        CellType.ENEMY: "Battle_UnitScan_Red",
+        CellType.FRIEND: "Battle_UnitScan_Green",
+    }
+
+    CELL_SIZE = 120
+
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+            cls._instance._initialized = False
+        return cls._instance
+
+    def init(self):
+        """初始化识别器"""
+        self._initialized = True
+        logger.info("RecoProcessor 初始化完成")
+
+    def detect_cell_type(self, cell: Cell, context) -> CellType:
+        """通过 Pipeline Node 检测单个格子内的单位类型"""
+        img = context.tasker.controller.post_screencap().wait().get()
+
+        # 优先检测我方（蓝色），因为战斗中主要操作我方单位
+        for cell_type, node_name in [
+            (CellType.SELF, self.PIPELINE_NODES.get(CellType.SELF)),
+            (CellType.ENEMY, self.PIPELINE_NODES.get(CellType.ENEMY)),
+            (CellType.FRIEND, self.PIPELINE_NODES.get(CellType.FRIEND)),
+        ]:
+            if not node_name:
+                continue
+
+            reco = context.run_recognition(node_name, img)
+
+            if reco and reco.hit and reco.all_results:
+                # 检查检测结果是否在当前格子内
+                for result in reco.all_results:
+                    if hasattr(result, "box") and result.box:
+                        bx, by, bw, bh = result.box
+                        # 检查是否在格子内
+                        if (
+                            bx >= cell.rect.x
+                            and bx + bw <= cell.rect.x + cell.rect.width
+                            and by >= cell.rect.y
+                            and by + bh <= cell.rect.y + cell.rect.height
+                        ):
+                            # 计算单位中心
+                            cell.unit_center = (bx + bw // 2, by + bh // 2)
+                            return cell_type
+
+        return CellType.NONE
+
+    def detect_threat_region(self, context) -> List[Tuple[int, int, int, int]]:
+        """通过 Pipeline Node 检测威胁区域，返回匹配区域列表 [(x, y, w, h), ...]"""
+        img = context.tasker.controller.post_screencap().wait().get()
+        reco = context.run_recognition(self.PIPELINE_NODES["threat"], img)
+
+        results = []
+        if reco and reco.hit and reco.all_results:
+            for result in reco.all_results:
+                if hasattr(result, "box") and result.box:
+                    results.append(result.box)
+            logger.info(f"威胁区域识别: {len(results)} 个结果")
+        else:
+            logger.info("威胁区域识别未命中")
+        return results
+
+    def scan_all_cells(self, grid: 'BattleGrid', context) -> List[Cell]:
+        """一次截图，批量检测所有格子内的单位类型"""
+        img = context.tasker.controller.post_screencap().wait().get()
+        units = []
+
+        # 一次截图后，对每种颜色只调用一次 run_recognition
+        for cell_type, node_name in [
+            (CellType.SELF, self.PIPELINE_NODES.get(CellType.SELF)),
+            (CellType.ENEMY, self.PIPELINE_NODES.get(CellType.ENEMY)),
+            (CellType.FRIEND, self.PIPELINE_NODES.get(CellType.FRIEND)),
+        ]:
+            if not node_name:
+                continue
+
+            reco = context.run_recognition(node_name, img)
+            if not reco or not reco.hit or not reco.all_results:
+                continue
+
+            # 遍历所有检测结果，归类到对应格子
+            for result in reco.all_results:
+                if not hasattr(result, "box") or not result.box:
+                    continue
+                bx, by, bw, bh = result.box
+
+                # 找到这个检测结果属于哪个格子
+                for r in range(grid.ROWS):
+                    for c in range(grid.COLS):
+                        cell = grid.cells[r][c]
+                        # 如果该格子已有单位，跳过（一个格子只能有一个单位）
+                        if cell.have_person:
+                            continue
+                        # 检查检测结果是否在格子内
+                        if (
+                            bx >= cell.rect.x
+                            and bx + bw <= cell.rect.x + cell.rect.width
+                            and by >= cell.rect.y
+                            and by + bh <= cell.rect.y + cell.rect.height
+                        ):
+                            cell.cell_type = cell_type
+                            cell.have_person = True
+                            cell.unit_center = (bx + bw // 2, by + bh // 2)
+                            units.append(cell)
+                            break
+
+        return units
+
+
+# ========================
+# 结构层：BattleGrid
+# ========================
+
+
+@dataclass
+class BattleGrid:
+    ROWS: int = 10
+    COLS: int = 6
+    CELL_WIDTH: int = 120
+    CELL_HEIGHT: int = 120
+
+    offset_x: int = 0
+    offset_y: int = 0
+    cells: List[List[Cell]] = field(default_factory=list)
+
+    reco_processor: RecoProcessor = field(default_factory=RecoProcessor)
+    self_units: List[Cell] = field(default_factory=list)
+    enemy_units: List[Cell] = field(default_factory=list)
+    friend_units: List[Cell] = field(default_factory=list)
+
+    def __post_init__(self):
+        if not self.cells:
+            self.init_cells()
+        if not self.reco_processor._initialized:
+            self.reco_processor.init()
+
+    def init_cells(self):
+        """初始化网格"""
+        for r in range(self.ROWS):
+            row = []
+            for c in range(self.COLS):
+                rect = CellRect(
+                    x=self.offset_x + c * self.CELL_WIDTH,
+                    y=self.offset_y + r * self.CELL_HEIGHT,
+                    width=self.CELL_WIDTH,
+                    height=self.CELL_HEIGHT,
+                )
+                row.append(Cell(row=r, col=c, rect=rect))
+            self.cells.append(row)
+
+    def get_cell(self, row: int, col: int) -> Optional[Cell]:
+        """获取格子"""
+        if 0 <= row < self.ROWS and 0 <= col < self.COLS:
+            return self.cells[row][col]
+        return None
+
+    def pixel_to_grid(self, pixel_x: int, pixel_y: int) -> Tuple[int, int]:
+        """像素坐标转网格坐标"""
+        col = round((pixel_x - self.offset_x) / self.CELL_WIDTH) if self.CELL_WIDTH > 0 else 0
+        row = round((pixel_y - self.offset_y) / self.CELL_HEIGHT) if self.CELL_HEIGHT > 0 else 0
+        return (row, col)
+
+    def grid_to_pixel(self, row: int, col: int) -> Tuple[int, int]:
+        """网格坐标转像素中心"""
+        x = self.offset_x + col * self.CELL_WIDTH + self.CELL_WIDTH // 2
+        y = self.offset_y + row * self.CELL_HEIGHT + self.CELL_HEIGHT // 2
+        return (x, y)
+
+    def clear_units(self):
+        """清空单位列表"""
+        self.self_units.clear()
+        self.enemy_units.clear()
+        self.friend_units.clear()
+
+    def detect(self, context):
+        """检测所有格子，更新类型和单位"""
+        self.clear_units()
+
+        # 使用 scan_all_cells 一次截图批量检测
+        units = self.reco_processor.scan_all_cells(self, context)
+
+        # 按单位类型分类到不同队列
+        for unit in units:
+            if unit.cell_type == CellType.SELF:
+                self.self_units.append(unit)
+            elif unit.cell_type == CellType.ENEMY:
+                self.enemy_units.append(unit)
+            elif unit.cell_type == CellType.FRIEND:
+                self.friend_units.append(unit)
+
+    def detect_threat(self, context):
+        """检测威胁区域"""
+        threat_regions = self.reco_processor.detect_threat_region(context)
+        # 清空所有格子的威胁标记
+        for r in range(self.ROWS):
+            for c in range(self.COLS):
+                self.cells[r][c].is_threat = False
+        # 标记威胁区域内的格子
+        for (bx, by, bw, bh) in threat_regions:
+            for r in range(self.ROWS):
+                for c in range(self.COLS):
+                    cell = self.cells[r][c]
+                    # 检查格子中心是否在威胁区域内
+                    cx, cy = self.grid_to_pixel(r, c)
+                    if bx <= cx < bx + bw and by <= cy < by + bh:
+                        cell.is_threat = True
+
+    def reset_move_attack_flags(self):
+        """重置移动/攻击标记"""
+        for r in range(self.ROWS):
+            for c in range(self.COLS):
+                self.cells[r][c].is_moveable = False
+                self.cells[r][c].is_attackable = False
+
+    def battle(self, controller_id: str, context):
+        """战斗循环"""
+        while self.self_units:
+            cur = self.self_units.pop(0)
+            self.reset_move_attack_flags()
+            self.detect_round(cur, controller_id, context)
+            self.battle_decision(cur, controller_id, context)
+
+    def detect_round(self, cell: Cell, controller_id: str, context):
+        """采集攻击和移动范围：点击单位后截图检测"""
+        # 1. 点击选中我方单位
+        cx, cy = cell.rect.center()
+        from maa_mcp import click
+        click(controller_id, cx, cy)
+
+        # 2. 等待 UI 响应（攻击/移动范围显示）
+        from maa_mcp import wait
+        wait(1)  # 等待 1 秒
+
+        # 3. 截图检测攻击和移动范围
+        img = context.tasker.controller.post_screencap().wait().get()
+
+        # 检测移动范围（绿色）
+        self._detect_range(context, img, "move")
+
+        # 检测攻击范围（红色）
+        self._detect_range(context, img, "attack")
+
+    def _detect_range(self, context, img, range_type: str):
+        """检测攻击或移动范围"""
+        node_name = f"Battle_{range_type.capitalize()}Range"
+        reco = context.run_recognition(node_name, img)
+
+        if not reco or not reco.hit or not reco.all_results:
+            logger.info(f"{range_type} 范围识别未命中")
+            return
+
+        for result in reco.all_results:
+            if not hasattr(result, "box") or not result.box:
+                continue
+            bx, by, bw, bh = result.box
+
+            # 找到这个检测结果属于哪个格子，标记为可攻击/可移动
+            for r in range(self.ROWS):
+                for c in range(self.COLS):
+                    cell = self.cells[r][c]
+                    if (
+                        bx >= cell.rect.x
+                        and bx + bw <= cell.rect.x + cell.rect.width
+                        and by >= cell.rect.y
+                        and by + bh <= cell.rect.y + cell.rect.height
+                    ):
+                        if range_type == "attack":
+                            cell.is_attackable = True
+                        else:
+                            cell.is_moveable = True
+                        break
+
+    def battle_decision(self, cell: Cell, controller_id: str, context):
+        """战斗决策：攻击欧式距离最短的敌人"""
+        # TODO: 实现攻击决策逻辑
+        raise NotImplementedError("battle_decision 需要用户实现")
+
+    @classmethod
+    def create_default(cls, offset_x: int = 0, offset_y: int = 0) -> 'BattleGrid':
+        """创建默认尺寸的网格"""
+        return cls(
+            ROWS=10,
+            COLS=6,
+            CELL_WIDTH=120,
+            CELL_HEIGHT=120,
+            offset_x=offset_x,
+            offset_y=offset_y,
+        )
+
+
+# ========================
+# 辅助函数
+# ========================
+
+
+def click_cell(controller_id: str, cell: Cell, duration: int = 50):
+    """点击格子"""
+    cx, cy = cell.rect.center()
+    from maa_mcp import click
+    click(controller_id, cx, cy)
+
+
+def double_click_cell(controller_id: str, cell: Cell, duration: int = 50):
+    """双击格子"""
+    cx, cy = cell.rect.center()
+    from maa_mcp import double_click
+    double_click(controller_id, cx, cy)
+
+
+def draw_battle_grid_debug(
+    image: np.ndarray, grid: BattleGrid, output_path: str = None
+) -> np.ndarray:
+    """绘制调试图像：在截图上显示网格线和单位位置"""
+    bgr = image if isinstance(image, np.ndarray) else np.array(image)
+
+    # 绘制网格线
+    for r in range(grid.ROWS + 1):
+        y = grid.offset_y + r * grid.CELL_HEIGHT
+        cv2.line(
+            bgr,
+            (grid.offset_x, y),
+            (grid.offset_x + grid.COLS * grid.CELL_WIDTH, y),
+            (255, 255, 0),
+            1,
+        )
+    for c in range(grid.COLS + 1):
+        x = grid.offset_x + c * grid.CELL_WIDTH
+        cv2.line(
+            bgr,
+            (x, grid.offset_y),
+            (x, grid.offset_y + grid.ROWS * grid.CELL_HEIGHT),
+            (255, 255, 0),
+            1,
+        )
+
+    # 绘制威胁区域
+    threat_overlay = bgr.copy()
+    for r in range(grid.ROWS):
+        for c in range(grid.COLS):
+            cell = grid.cells[r][c]
+            if cell.is_threat:
+                x = grid.offset_x + c * grid.CELL_WIDTH
+                y = grid.offset_y + r * grid.CELL_HEIGHT
+                cv2.rectangle(
+                    threat_overlay,
+                    (x, y),
+                    (x + grid.CELL_WIDTH, y + grid.CELL_HEIGHT),
+                    (0, 0, 255),
+                    -1,
+                )
+    cv2.addWeighted(bgr, 0.7, threat_overlay, 0.3, 0, bgr)
+
+    # 绘制单位
+    unit_colors = {
+        CellType.SELF: (255, 0, 0),
+        CellType.ENEMY: (0, 0, 255),
+        CellType.FRIEND: (0, 255, 0),
+    }
+    for r in range(grid.ROWS):
+        for c in range(grid.COLS):
+            cell = grid.cells[r][c]
+            if not cell.have_person:
+                continue
+            color = unit_colors.get(cell.cell_type, (128, 128, 128))
+            cx, cy = cell.rect.center()
+            cv2.circle(bgr, (cx, cy), 5, color, -1)
+            cv2.putText(
+                bgr,
+                f"({r},{c})",
+                (cx + 10, cy - 10),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.5,
+                color,
+                1,
+            )
+
+    if output_path:
+        cv2.imwrite(output_path, bgr)
+        logger.info(f"调试图像已保存: {output_path}")
+    return bgr
+
+
+def grid_to_text_report(grid: BattleGrid) -> str:
+    """生成网格识别的文本报告"""
+    threat_count = sum(1 for row in grid.cells for cell in row if cell.is_threat)
+    all_units = [cell for row in grid.cells for cell in row if cell.have_person]
+
+    lines = [
+        "=" * 50,
+        "战场网格识别报告",
+        "=" * 50,
+        f"网格尺寸: {grid.COLS} 列 x {grid.ROWS} 行",
+        f"格子大小: {grid.CELL_WIDTH} x {grid.CELL_HEIGHT} 像素",
+        f"网格偏移: ({grid.offset_x}, {grid.offset_y})",
+        "",
+        f"威胁区域: {threat_count} 格子",
+        f"单位数量: {len(all_units)}",
+        "",
+        "单位详情:",
+        "-" * 30,
+    ]
+
+    type_labels = {
+        CellType.SELF: "我方单位",
+        CellType.ENEMY: "敌方单位",
+        CellType.FRIEND: "友军单位",
+    }
+    for cell_type, label in type_labels.items():
+        group = [u for u in all_units if u.cell_type == cell_type]
+        if group:
+            lines.append(f"{label} ({len(group)}):")
+            for unit in group:
+                lines.append(
+                    f"  - 网格坐标: ({unit.row}, {unit.col}), "
+                    f"像素: {unit.rect.center()}"
+                )
+
+    lines.append("=" * 50)
+    return "\n".join(lines)
+
+
+def main(dir_path: str, image_path: str):
+    """调试主函数"""
+    full_path = os.path.join(dir_path, image_path)
+    debug_dir = dir_path
+
+    print(f"读取图片: {full_path}", flush=True)
+    if not os.path.exists(full_path):
+        print(f"图片不存在: {full_path}", flush=True)
+        return
+
+    image = cv2.imread(full_path)
+    if image is None:
+        print(f"无法读取图片: {full_path}", flush=True)
+        return
+
+    print(f"图片尺寸: {image.shape}", flush=True)
+
+    grid = BattleGrid.create_default()
+    # 注意：旧 API 需要 context，这里用不了
+    logger.warning("main() 需要 context 参数，请使用新的 API")
+    logger.info("如需调试，请直接使用 BattleGrid.detect(context)")
+
+    report = grid_to_text_report(grid)
+    print(report, flush=True)
+
+
+# ========================
+# 兼容层：支持旧 API
+# ========================
+
+# 旧 API 的 UnitType 映射到新的 CellType
 class UnitType(Enum):
     ALLY = "ally"
     ENEMY = "enemy"
     FRIENDLY = "friendly"
 
 
+def _convert_unit_type(old_type: UnitType) -> CellType:
+    """将旧 UnitType 转换为新的 CellType"""
+    mapping = {
+        UnitType.ALLY: CellType.SELF,
+        UnitType.ENEMY: CellType.ENEMY,
+        UnitType.FRIENDLY: CellType.FRIEND,
+    }
+    return mapping.get(old_type, CellType.NONE)
+
+
+def _convert_cell_type(new_type: CellType) -> UnitType:
+    """将新的 CellType 转换为旧 UnitType"""
+    mapping = {
+        CellType.SELF: UnitType.ALLY,
+        CellType.ENEMY: UnitType.ENEMY,
+        CellType.FRIEND: UnitType.FRIENDLY,
+    }
+    return mapping.get(new_type, UnitType.ALLY)
+
+
 @dataclass
 class GridPosition:
+    """兼容层：保留旧 API 的 GridPosition"""
     row: int
     col: int
     x: int
@@ -39,894 +565,53 @@ class GridPosition:
 
 @dataclass
 class Unit:
+    """兼容层：保留旧 API 的 Unit 类"""
     unit_type: UnitType
     grid_pos: GridPosition
-    hp: int = 0
-    pixel_box: List[int] = None
-
-    def __post_init__(self):
-        if self.pixel_box is None:
-            self.pixel_box = []
-
-
-@dataclass
-class BattleGrid:
-    cell_width: int = 0
-    cell_height: int = 0
-    offset_x: int = 0
-    offset_y: int = 0
-    total_rows: int = 0
-    total_cols: int = 0
-    units: List[Unit] = field(default_factory=list)
-    threat_cells: Set[Tuple[int, int]] = field(default_factory=set)
-
-    def pixel_to_grid(self, pixel_x: int, pixel_y: int) -> Tuple[int, int]:
-        col = (
-            round((pixel_x - self.offset_x) / self.cell_width)
-            if self.cell_width > 0
-            else 0
-        )
-        row = (
-            round((pixel_y - self.offset_y) / self.cell_height)
-            if self.cell_height > 0
-            else 0
-        )
-        return (row, col)
-
-    def grid_to_pixel(self, row: int, col: int) -> Tuple[int, int]:
-        pixel_x = self.offset_x + col * self.cell_width + self.cell_width // 2
-        pixel_y = self.offset_y + row * self.cell_height + self.cell_height // 2
-        return (pixel_x, pixel_y)
-
-    def is_valid_cell(self, row: int, col: int) -> bool:
-        return 0 <= row < self.total_rows and 0 <= col < self.total_cols
-
-    def is_threat_cell(self, row: int, col: int) -> bool:
-        return (row, col) in self.threat_cells
-
-
-@dataclass
-class DetectedCell:
-    x: int
-    y: int
-    width: int
-    height: int
-    grid_row: int = 0
-    grid_col: int = 0
-    score: int = 0
+    pixel_box: List[int] = field(default_factory=list)
 
 
 class BattleGridRecognizer:
-    BLOOD_COLORS = {
-        UnitType.ALLY: {
-            "lower": np.array([200, 140, 0]),
-            "upper": np.array([255, 200, 50]),
-        },
-        UnitType.ENEMY: {
-            "lower": np.array([20, 0, 180]),
-            "upper": np.array([80, 60, 255]),
-        },
-        UnitType.FRIENDLY: {
-            "lower": np.array([100, 200, 100]),
-            "upper": np.array([180, 255, 180]),
-        },
-    }
-
-    CELL_SIZE = 120
-    UI_BOTTOM_MARGIN = 100
-    THREAT_RED_HSV = {
-        "lower": np.array([6, 150, 91]),
-        "upper": np.array([18, 181, 162]),
-    }
-
-    # Pipeline Node 映射
-    PIPELINE_NODES = {
-        "threat": "Battle_ThreatRegion",
-        UnitType.ALLY: "Battle_UnitScan_Blue",
-        UnitType.ENEMY: "Battle_UnitScan_Red",
-        UnitType.FRIENDLY: "Battle_UnitScan_Green",
-    }
+    """兼容层：保留 BattleGridRecognizer 接口"""
 
     def __init__(self, is_opencv: bool = True):
-        self.grid: Optional[BattleGrid] = None
-        self.debug_dir: str = ""
         self.is_opencv = is_opencv
         self.detect_only_units = True
+        self.grid: Optional[BattleGrid] = None
+        self.debug_dir: str = ""
 
-    def detect_grid_from_threat(
-        self,
-        image: np.ndarray,
-        debug_dir: str = "",
-        context: Context = None,
-    ) -> BattleGrid:
+    def recognize(self, image, debug_dir: str = "", context=None):
+        """兼容层的识别方法"""
+        if context is None:
+            raise ValueError("BattleGridRecognizer 需要 context 参数")
+
         self.debug_dir = debug_dir
-        img_array = np.array(image)
-        bgr_array = img_array[:, :, ::-1]
 
-        if self.detect_only_units:
-            logger.info("detect_only_units 模式，跳过格子检测")
-            self.grid = BattleGrid(
-                cell_width=self.CELL_SIZE,
-                cell_height=self.CELL_SIZE,
-                offset_x=0,
-                offset_y=0,
-                total_rows=10,
-                total_cols=6,
-            )
-            logger.info(f"使用默认网格: {self.grid.total_cols}x{self.grid.total_rows}")
-            return self.grid
+        # 创建 BattleGrid
+        self.grid = BattleGrid.create_default()
 
-        if self.is_opencv:
-            threat_mask = self._detect_threat_region(bgr_array)
-        else:
-            assert context is not None, "Pipeline 模式需要传入 Context"
-            threat_mask = self._detect_threat_region_pipeline(context)
+        # 检测单位
+        self.grid.detect(context)
 
-        if self.debug_dir:
-            os.makedirs(self.debug_dir, exist_ok=True)
-            cv2.imwrite(
-                os.path.join(self.debug_dir, "debug_threat_mask.png"), threat_mask
-            )
+        return self.grid
 
-        detected_cells = self._detect_cells_from_hough(threat_mask)
-        base_cell = self._select_base_cell(detected_cells)
-        grid = self._build_grid_from_base(base_cell, img_array.shape)
-        grid = self._identify_threat_cells(grid, threat_mask)
-
-        self.grid = grid
-        logger.info(
-            f"网格检测完成: {grid.total_cols}x{grid.total_rows}, "
-            f"格子尺寸: {grid.cell_width}x{grid.cell_height}"
-        )
-        return grid
-
-    def _detect_threat_region(self, bgr_array: np.ndarray) -> np.ndarray:
-        hsv_array = cv2.cvtColor(bgr_array, cv2.COLOR_BGR2HSV)
-        lower = self.THREAT_RED_HSV["lower"]
-        upper = self.THREAT_RED_HSV["upper"]
-        mask = cv2.inRange(hsv_array, lower, upper)
-        logger.info(
-            f"THREAT_RED_HSV lower={lower}, upper={upper}, 匹配像素数={np.count_nonzero(mask)}"
-        )
-        return mask
-
-    def _detect_threat_region_pipeline(self, context: Context) -> np.ndarray:
-        """通过 Pipeline Node 检测威胁区域，返回二值化 mask"""
-        img = context.tasker.controller.post_screencap().wait().get()
-
-        reco = context.run_recognition(
-            self.PIPELINE_NODES["threat"],
-            img,
-        )
-        h, w = img.shape[:2]
-
-        mask = np.zeros((h, w), dtype=np.uint8)
-        if reco.hit and reco.filtered_results:
-            for result in reco.filtered_results:
-                x, y, bw, bh = result.box
-                mask[y : y + bh, x : x + bw] = 255
-            logger.info(f"Pipeline 威胁区域识别: {len(reco.filtered_results)} 个结果")
-        else:
-            logger.info("Pipeline 威胁区域识别未命中")
-        return mask
-
-    def _detect_cells_from_hough(self, threat_mask: np.ndarray) -> List[DetectedCell]:
-        binary_mask = (threat_mask > 0).astype(np.uint8) * 255
-        edges = cv2.Canny(binary_mask, 50, 150)
-
-        # 保存边缘二值图
-        if self.debug_dir:
-            cv2.imwrite(os.path.join(self.debug_dir, "debug_edges.png"), edges)
-
-        lines = cv2.HoughLinesP(
-            edges, 1, np.pi / 180, 50, minLineLength=30, maxLineGap=10
-        )
-
-        detected_cells = []
-
-        if lines is not None:
-            h_lines, v_lines = [], []
-
-            for line in lines:
-                x1, y1, x2, y2 = line[0]
-                angle_deg = abs(np.arctan2(y2 - y1, x2 - x1) * 180 / np.pi)
-                angle_deg = min(angle_deg, 180 - angle_deg)
-
-                if angle_deg <= 10:
-                    h_lines.append((min(x1, x2), min(y1, y2), max(x1, x2), max(y1, y2)))
-                elif abs(angle_deg - 90) <= 10:
-                    v_lines.append((min(x1, x2), min(y1, y2), max(x1, x2), max(y1, y2)))
-
-            cs = self.CELL_SIZE
-            for hx1, hy1, hx2, _ in h_lines:
-                for vx1, _, _, vy2 in v_lines:
-                    w, h = hx2 - hx1, vy2 - hy1
-                    if cs - 5 <= w <= cs + 5 and cs - 5 <= h <= cs + 5:
-                        detected_cells.append(
-                            DetectedCell(x=vx1, y=hy1, width=w, height=h, score=1)
-                        )
-
-        if not detected_cells:
-            logger.info("霍夫未检测到格子，尝试从威胁区域像素分布推断")
-            detected_cells = self._detect_cells_from_mask_area(threat_mask)
-
-        logger.info(f"共检测到 {len(detected_cells)} 个符合{self.CELL_SIZE}±5的格子")
-        return detected_cells
-
-    def _detect_cells_from_mask_area(
-        self, threat_mask: np.ndarray
-    ) -> List[DetectedCell]:
-        rows, cols = np.where(threat_mask > 0)
-        if len(rows) == 0:
-            return []
-
-        min_y, max_y = np.min(rows), np.max(rows)
-        min_x, max_x = np.min(cols), np.max(cols)
-        logger.info(f"威胁区域边界: x[{min_x}, {max_x}], y[{min_y}, {max_y}]")
-
-        est_cols = max(1, round((max_x - min_x) / self.CELL_SIZE))
-        est_rows = max(1, round((max_y - min_y) / self.CELL_SIZE))
-        logger.info(f"推断网格: {est_cols}列 x {est_rows}行")
-
-        cs = self.CELL_SIZE
-        return [
-            DetectedCell(
-                x=min_x + col * cs, y=min_y + row * cs, width=cs, height=cs, score=1
-            )
-            for row in range(est_rows)
-            for col in range(est_cols)
-        ]
-
-    def _select_base_cell(self, detected_cells: List[DetectedCell]) -> DetectedCell:
-        if not detected_cells:
-            logger.info(f"未检测到格子，使用默认{self.CELL_SIZE}x{self.CELL_SIZE}基准")
-            return DetectedCell(
-                x=50, y=200, width=self.CELL_SIZE, height=self.CELL_SIZE, score=0
-            )
-
-        sorted_cells = sorted(detected_cells, key=lambda c: c.score, reverse=True)
-        top3 = sorted_cells[:3]
-        logger.info(f"Top3格子: {[(c.x, c.y, c.width, c.height) for c in top3]}")
-
-        base_cell = top3[0]
-        logger.info(
-            f"选择基准格子: ({base_cell.x}, {base_cell.y}), {base_cell.width}x{base_cell.height}"
-        )
-        return base_cell
-
-    def _build_grid_from_base(
-        self, base_cell: DetectedCell, img_shape: Tuple[int, ...]
-    ) -> BattleGrid:
-        """
-        基于基准格子向四个方向逐步扩展生成完整网格
-
-        扩展流程：
-        1. 从基准格子向左逐步扩展，直到触碰左边界 → 记录左方列数
-        2. 从基准格子向右逐步扩展，直到触碰右边界 → 记录右方列数
-        3. 一行格子数 = 左方列数 + 1(基准) + 右方列数
-        4. 从基准格子向上逐步扩展，直到触碰上边界 → 记录上方行数
-        5. 从基准格子向下逐步扩展，直到触碰下边界 → 记录下方行数
-        6. 一列格子数 = 上方行数 + 1(基准) + 下方行数
-        7. 基于行数和列数一次性生成完整网格矩阵
-
-        Args:
-            base_cell: 基准格子
-            img_shape: 图像尺寸
-
-        Returns:
-            BattleGrid 对象
-        """
-        height, width = img_shape[0], img_shape[1]
-        cs = self.CELL_SIZE
-
-        cols_left = 0
-        x = base_cell.x - cs
-        while x >= 0:
-            cols_left += 1
-            x -= cs
-
-        cols_right = 0
-        x = base_cell.x + cs
-        while x + cs <= width:
-            cols_right += 1
-            x += cs
-
-        rows_up = 0
-        y = base_cell.y - cs
-        while y >= 0:
-            rows_up += 1
-            y -= cs
-
-        rows_down = 0
-        y = base_cell.y + cs
-        while y + cs <= height - self.UI_BOTTOM_MARGIN:
-            rows_down += 1
-            y += cs
-
-        total_cols = cols_left + 1 + cols_right
-        total_rows = rows_up + 1 + rows_down
-        offset_x = base_cell.x - cols_left * cs
-        offset_y = base_cell.y - rows_up * cs
-
-        base_cell.grid_row = rows_up
-        base_cell.grid_col = cols_left
-
-        logger.info(
-            f"行扩展: ←左{cols_left}格 + 基准 + 右{cols_right}格→ = 一行{total_cols}格"
-        )
-        logger.info(
-            f"列扩展: ↑上{rows_up}格 + 基准 + 下{rows_down}格↓ = 一列{total_rows}格"
-        )
-        logger.info(
-            f"网格矩阵: {total_cols}列x{total_rows}行, "
-            f"起始偏移({offset_x}, {offset_y}), "
-            f"基准格子位于(row={base_cell.grid_row}, col={base_cell.grid_col})"
-        )
-
-        all_cells = self._expand_grid_cells(total_rows, total_cols, offset_x, offset_y)
-
-        if self.debug_dir:
-            self._draw_debug_overlay(all_cells, base_cell)
-
-        return BattleGrid(
-            cell_width=cs,
-            cell_height=cs,
-            offset_x=offset_x,
-            offset_y=offset_y,
-            total_rows=total_rows,
-            total_cols=total_cols,
-        )
-
-    def _expand_grid_cells(
-        self, total_rows: int, total_cols: int, offset_x: int, offset_y: int
-    ) -> List[DetectedCell]:
-        cs = self.CELL_SIZE
-        return [
-            DetectedCell(
-                x=offset_x + col * cs,
-                y=offset_y + row * cs,
-                width=cs,
-                height=cs,
-                grid_row=row,
-                grid_col=col,
-                score=0,
-            )
-            for row in range(total_rows)
-            for col in range(total_cols)
-        ]
-
-    def _draw_debug_overlay(
-        self, all_cells: List[DetectedCell], base_cell: DetectedCell
-    ) -> None:
-        """
-        在调试图像上绘制所有格子
-
-        Args:
-            all_cells: 所有格子的列表
-            base_cell: 基准格子（跳过绘制，由_draw_base_cell_marker单独标记）
-        """
-        debug_img_path = os.path.join(self.debug_dir, "debug_threat_mask.png")
-        if not os.path.exists(debug_img_path):
-            return
-
-        img = cv2.imread(debug_img_path)
-        if img is None:
-            return
-
-        for cell in all_cells:
-            is_base = (
-                cell.grid_row == base_cell.grid_row
-                and cell.grid_col == base_cell.grid_col
-            )
-
-            if is_base:
-                cx = cell.x + cell.width // 2
-                cy = cell.y + cell.height // 2
-                size = 30
-                color = (0, 255, 255)
-                cv2.line(img, (cx - size, cy - size), (cx + size, cy + size), color, 3)
-                cv2.line(img, (cx + size, cy - size), (cx - size, cy + size), color, 3)
-                cv2.circle(img, (cx, cy), size // 2, color, 2)
-                cv2.putText(
-                    img,
-                    f"BASE({cell.grid_row},{cell.grid_col})",
-                    (cx - 40, cy - size - 10),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    0.6,
-                    color,
-                    2,
-                )
-            else:
-                x1, y1 = cell.x, cell.y
-                x2, y2 = cell.x + cell.width, cell.y + cell.height
-                color = (100, 100, 100)
-                cv2.rectangle(img, (x1, y1), (x2, y2), color, 1)
-                cv2.putText(
-                    img,
-                    f"({cell.grid_row},{cell.grid_col})",
-                    (x1 + 2, y1 + 15),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    0.4,
-                    color,
-                    1,
-                )
-
-        cv2.imwrite(debug_img_path, img)
-        logger.info(f"调试覆盖已绘制: {debug_img_path}, 共{len(all_cells)}个格子")
-
-    def _identify_threat_cells(
-        self, grid: BattleGrid, threat_mask: np.ndarray
-    ) -> BattleGrid:
-        """识别威胁区域格子"""
-        threat_cells = set()
-        mask_h, mask_w = threat_mask.shape[:2]
-        for row in range(grid.total_rows):
-            for col in range(grid.total_cols):
-                cx, cy = grid.grid_to_pixel(row, col)
-                if 0 <= cx < mask_w and 0 <= cy < mask_h and threat_mask[cy, cx] > 0:
-                    threat_cells.add((row, col))
-        grid.threat_cells = threat_cells
-        logger.info(f"识别到 {len(grid.threat_cells)} 个威胁格子")
-        return grid
-
-    def scan_units(self, image: np.ndarray, context: Context = None) -> List[Unit]:
-        """
-        扫描血条识别单位
-
-        Args:
-            image: numpy 数组（BGR 格式）
-            context: Context 对象（Pipeline 模式需要）
-
-        Returns:
-            Unit 列表
-        """
+    def _convert_units(self):
+        """将新的 Cell 转换为旧的 Unit"""
         if self.grid is None:
-            logger.error("请先调用 detect_grid_from_threat()")
             return []
 
-        if self.is_opencv:
-            bgr_array = np.array(image)[:, :, ::-1]
-            units = self._scan_grid_cells_opencv(bgr_array)
-        else:
-            assert context is not None, "Pipeline 模式需要传入 Context"
-            units = self._scan_units_pipeline(context)
-
-        self.grid.units = units
-        logger.info(f"识别到 {len(units)} 个单位")
-        for unit in units:
-            logger.debug(
-                f"  - {unit.unit_type.value}: "
-                f"网格({unit.grid_pos.row}, {unit.grid_pos.col}), "
-                f"像素({unit.grid_pos.x}, {unit.grid_pos.y})"
-            )
-        return units
-
-    def _scan_grid_cells_opencv(self, bgr_array: np.ndarray) -> List[Unit]:
-        """
-        逐格检查颜色，判断每个格子内是否有单位
-
-        对每个格子：
-        1. 裁剪格子区域的图像
-        2. 分别检测三种颜色（我方/敌方/友军）
-        3. 如果某个颜色有匹配，标记这个格子为对应阵营
-        4. 每个格子只能有一个单位
-        """
-        if self.detect_only_units:
-            return self._scan_units_direct_opencv(bgr_array)
-
         units = []
-        grid = self.grid
-
-        for row in range(grid.total_rows):
-            for col in range(grid.total_cols):
-                # 计算格子边界
-                cell_x = grid.offset_x + col * grid.cell_width
-                cell_y = grid.offset_y + row * grid.cell_height
-                cell_right = cell_x + grid.cell_width
-                cell_bottom = cell_y + grid.cell_height
-
-                # 裁剪格子区域（防止越界）
-                cell_y1 = max(0, cell_y)
-                cell_y2 = min(bgr_array.shape[0], cell_bottom)
-                cell_x1 = max(0, cell_x)
-                cell_x2 = min(bgr_array.shape[1], cell_right)
-
-                if cell_y1 >= cell_y2 or cell_x1 >= cell_x2:
-                    continue
-
-                cell_region = bgr_array[cell_y1:cell_y2, cell_x1:cell_x2]
-
-                # 检查三种颜色，取匹配像素最多的作为判定结果
-                best_type = None
-                best_count = 0
-                best_mask = None
-
-                for unit_type, color_config in self.BLOOD_COLORS.items():
-                    mask = cv2.inRange(
-                        cell_region, color_config["lower"], color_config["upper"]
+        for r in range(self.grid.ROWS):
+            for c in range(self.grid.COLS):
+                cell = self.grid.cells[r][c]
+                if cell.have_person:
+                    unit_type = _convert_cell_type(cell.cell_type)
+                    grid_pos = GridPosition(
+                        row=cell.row,
+                        col=cell.col,
+                        x=cell.unit_center[0],
+                        y=cell.unit_center[1],
                     )
-                    count = np.count_nonzero(mask)
-                    if count > best_count:
-                        best_count = count
-                        best_type = unit_type
-                        best_mask = mask
-
-                # 格子内颜色像素超过阈值才认为是有效单位
-                if best_type is not None and best_count >= 10:
-                    # 计算颜色区域的中心作为单位位置
-                    if best_mask is not None:
-                        rows, cols = np.where(best_mask > 0)
-                        if len(rows) > 0:
-                            unit_x = cell_x1 + int(np.mean(cols))
-                            unit_y = cell_y1 + int(np.mean(rows))
-                        else:
-                            unit_x = cell_x + grid.cell_width // 2
-                            unit_y = cell_y + grid.cell_height // 2
-                    else:
-                        unit_x = cell_x + grid.cell_width // 2
-                        unit_y = cell_y + grid.cell_height // 2
-
-                    grid_pos = GridPosition(row=row, col=col, x=unit_x, y=unit_y)
-                    units.append(
-                        Unit(
-                            unit_type=best_type,
-                            grid_pos=grid_pos,
-                            pixel_box=[
-                                cell_x,
-                                cell_y,
-                                grid.cell_width,
-                                grid.cell_height,
-                            ],
-                        )
-                    )
-                    logger.debug(
-                        f"格子({row},{col}) 检测到 {best_type.value}: {best_count} 像素"
-                    )
-
+                    pixel_box = cell.rect.to_box()
+                    units.append(Unit(unit_type=unit_type, grid_pos=grid_pos, pixel_box=pixel_box))
         return units
-
-    def _scan_units_direct_opencv(self, bgr_array: np.ndarray) -> List[Unit]:
-        """
-        直接检测整张图片中的单位，不依赖格子
-
-        1. 对整个图像检测三种颜色（我方/敌方/友军）
-        2. 找轮廓，取中心点
-        3. 直接返回单位列表
-        """
-        units = []
-        grid = self.grid
-
-        for unit_type, color_config in self.BLOOD_COLORS.items():
-            mask = cv2.inRange(bgr_array, color_config["lower"], color_config["upper"])
-            contours, _ = cv2.findContours(
-                mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
-            )
-
-            for contour in contours:
-                if cv2.contourArea(contour) < 50:
-                    continue
-
-                x, y, w, h = cv2.boundingRect(contour)
-                center_x = x + w // 2
-                center_y = y + h // 2
-                row, col = grid.pixel_to_grid(center_x, center_y)
-                grid_pos = GridPosition(row=row, col=col, x=center_x, y=center_y)
-                units.append(
-                    Unit(unit_type=unit_type, grid_pos=grid_pos, pixel_box=[x, y, w, h])
-                )
-
-        # 去重：一个格子只能有一个单位，取第一个
-        return self._deduplicate_units(units)
-
-    def _deduplicate_units(self, units: List[Unit]) -> List[Unit]:
-        """根据网格坐标去重，每个格子只能有一个单位"""
-        seen = {}
-        for unit in units:
-            key = (unit.grid_pos.row, unit.grid_pos.col)
-            if key not in seen:
-                seen[key] = unit
-        result = list(seen.values())
-        logger.info(f"去重后: {len(result)} 个单位 (原始: {len(units)} 个)")
-        return result
-
-    def _scan_units_pipeline(self, context: Context) -> List[Unit]:
-        """通过 Pipeline Node 检测单位"""
-        units = []
-        grid = self.grid
-
-        if self.detect_only_units:
-            logger.info("detect_only_units 模式，直接检测所有单位")
-            for unit_type in self.BLOOD_COLORS:
-                node_name = self.PIPELINE_NODES.get(unit_type)
-                if not node_name:
-                    continue
-
-                reco = context.run_recognition(
-                    node_name,
-                    context.tasker.controller.post_screencap().wait().get(),
-                )
-
-                if reco and reco.hit and reco.all_results:
-                    for result in reco.all_results:
-                        if hasattr(result, "box") and result.box:
-                            bx, by, bw, bh = result.box
-                            center_x = bx + bw // 2
-                            center_y = by + bh // 2
-                            row, col = grid.pixel_to_grid(center_x, center_y)
-                            grid_pos = GridPosition(
-                                row=row, col=col, x=center_x, y=center_y
-                            )
-                            units.append(
-                                Unit(
-                                    unit_type=unit_type,
-                                    grid_pos=grid_pos,
-                                    pixel_box=[bx, by, bw, bh],
-                                )
-                            )
-                    logger.info(
-                        f"Pipeline {unit_type.value} 检测到 {len(reco.all_results)} 个"
-                    )
-                else:
-                    logger.info(f"Pipeline {unit_type.value} 未检测到")
-            # 去重：一个格子只能有一个单位
-            return self._deduplicate_units(units)
-
-        # 逐格检测模式
-        for row in range(grid.total_rows):
-            for col in range(grid.total_cols):
-                cell_x = grid.offset_x + col * grid.cell_width
-                cell_y = grid.offset_y + row * grid.cell_height
-
-                best_type = None
-                best_result = None
-
-                # 检查三种颜色
-                for unit_type in self.BLOOD_COLORS:
-                    node_name = self.PIPELINE_NODES.get(unit_type)
-                    if not node_name:
-                        continue
-
-                    reco = context.run_recognition(
-                        node_name,
-                        context.tasker.controller.post_screencap().wait().get(),
-                    )
-
-                    if reco and reco.hit and reco.all_results:
-                        for result in reco.all_results:
-                            if hasattr(result, "box") and result.box:
-                                bx, by, bw, bh = result.box
-                                # 检查这个检测结果是否在当前格子内
-                                if (
-                                    bx >= cell_x
-                                    and bx + bw <= cell_x + grid.cell_width
-                                    and by >= cell_y
-                                    and by + bh <= cell_y + grid.cell_height
-                                ):
-                                    if (
-                                        best_result is None
-                                        or result.count > best_result.count
-                                    ):
-                                        best_type = unit_type
-                                        best_result = result
-
-                if best_type is not None and best_result is not None:
-                    bx, by, bw, bh = best_result.box
-                    center_x = bx + bw // 2
-                    center_y = by + bh // 2
-                    grid_pos = GridPosition(row=row, col=col, x=center_x, y=center_y)
-                    units.append(
-                        Unit(
-                            unit_type=best_type,
-                            grid_pos=grid_pos,
-                            pixel_box=[bx, by, bw, bh],
-                        )
-                    )
-                    logger.debug(f"格子({row},{col}) Pipeline 检测到 {best_type.value}")
-
-        return units
-
-    def recognize(
-        self,
-        image: np.ndarray,
-        debug_dir: str = "",
-        context: Context = None,
-    ) -> BattleGrid:
-        """
-        完整的战场识别流程
-
-        Args:
-            image: numpy 数组（BGR 格式）
-            debug_dir: 调试图片保存目录
-            context: Context 对象（Pipeline 模式需要）
-
-        Returns:
-            BattleGrid 对象（包含网格和单位信息）
-        """
-        logger.info("开始战场识别...")
-        grid = self.detect_grid_from_threat(image, debug_dir, context)
-        units = self.scan_units(image, context)
-        grid.units = units
-
-        # 保存带网格和单位标注的调试图片
-        if debug_dir:
-            os.makedirs(debug_dir, exist_ok=True)
-            grid_overlay_path = os.path.join(debug_dir, "debug_grid_overlay.png")
-            draw_battle_grid_debug(image, grid, grid_overlay_path)
-
-        counts = {t: sum(1 for u in units if u.unit_type == t) for t in UnitType}
-        logger.info("战场识别完成:")
-        logger.info(f"  - 我方单位: {counts[UnitType.ALLY]}")
-        logger.info(f"  - 敌方单位: {counts[UnitType.ENEMY]}")
-        logger.info(f"  - 友军单位: {counts[UnitType.FRIENDLY]}")
-        logger.info(f"  - 威胁区域: {len(grid.threat_cells)} 格子")
-        return grid
-
-
-def draw_battle_grid_debug(
-    image: np.ndarray, grid: BattleGrid, output_path: str = None
-) -> np.ndarray:
-    """
-    绘制调试图像：在截图上显示网格线和单位位置
-
-    Args:
-        image: 原始截图（numpy 数组）
-        grid: 识别出的战场网格
-        output_path: 输出路径（可选）
-
-    Returns:
-        绘制了调试信息的 numpy 数组
-    """
-    if cv2 is None:
-        logger.error("opencv-python 未安装，无法生成调试图像")
-        return image
-
-    # image 已经是 BGR 格式（由 cv2.imread 或 MaaFramework 返回）
-    bgr_array = image if isinstance(image, np.ndarray) else np.array(image)
-
-    for row in range(grid.total_rows + 1):
-        y = grid.offset_y + row * grid.cell_height
-        cv2.line(
-            bgr_array,
-            (grid.offset_x, y),
-            (grid.offset_x + grid.total_cols * grid.cell_width, y),
-            (255, 255, 0),
-            1,
-        )
-
-    for col in range(grid.total_cols + 1):
-        x = grid.offset_x + col * grid.cell_width
-        cv2.line(
-            bgr_array,
-            (x, grid.offset_y),
-            (x, grid.offset_y + grid.total_rows * grid.cell_height),
-            (255, 255, 0),
-            1,
-        )
-
-    threat_overlay = bgr_array.copy()
-    for row, col in grid.threat_cells:
-        x = grid.offset_x + col * grid.cell_width
-        y = grid.offset_y + row * grid.cell_height
-        cv2.rectangle(
-            threat_overlay,
-            (x, y),
-            (x + grid.cell_width, y + grid.cell_height),
-            (0, 0, 255),
-            -1,
-        )
-    cv2.addWeighted(bgr_array, 0.7, threat_overlay, 0.3, 0, bgr_array)
-
-    unit_colors = {
-        UnitType.ALLY: (255, 0, 0),
-        UnitType.ENEMY: (0, 0, 255),
-        UnitType.FRIENDLY: (0, 255, 0),
-    }
-    for unit in grid.units:
-        color = unit_colors[unit.unit_type]
-        if unit.pixel_box:
-            x, y, w, h = unit.pixel_box
-            cv2.rectangle(bgr_array, (x, y), (x + w, y + h), color, 2)
-        cv2.circle(bgr_array, (unit.grid_pos.x, unit.grid_pos.y), 5, color, -1)
-        cv2.putText(
-            bgr_array,
-            f"({unit.grid_pos.row},{unit.grid_pos.col})",
-            (unit.grid_pos.x + 10, unit.grid_pos.y - 10),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            0.5,
-            color,
-            1,
-        )
-
-    if output_path:
-        cv2.imwrite(output_path, bgr_array)
-        logger.info(f"调试图像已保存到: {output_path}")
-    return bgr_array
-
-
-def grid_to_text_report(grid: BattleGrid) -> str:
-    """
-    生成网格识别的文本报告
-
-    Args:
-        grid: 识别出的战场网格
-
-    Returns:
-        格式化的文本报告
-    """
-    lines = [
-        "=" * 50,
-        "战场网格识别报告",
-        "=" * 50,
-        f"网格尺寸: {grid.total_cols} 列 x {grid.total_rows} 行",
-        f"格子大小: {grid.cell_width} x {grid.cell_height} 像素",
-        f"网格偏移: ({grid.offset_x}, {grid.offset_y})",
-        "",
-        f"威胁区域: {len(grid.threat_cells)} 格子",
-        f"单位数量: {len(grid.units)}",
-        "",
-        "单位详情:",
-        "-" * 30,
-    ]
-
-    type_labels = {
-        UnitType.ALLY: "我方单位",
-        UnitType.ENEMY: "敌方单位",
-        UnitType.FRIENDLY: "友军单位",
-    }
-    for unit_type, label in type_labels.items():
-        group = [u for u in grid.units if u.unit_type == unit_type]
-        if group:
-            lines.append(f"{label} ({len(group)}):")
-            for unit in group:
-                lines.append(
-                    f"  - 网格坐标: ({unit.grid_pos.row}, {unit.grid_pos.col}), "
-                    f"像素: ({unit.grid_pos.x}, {unit.grid_pos.y})"
-                )
-
-    lines.append("=" * 50)
-    return "\n".join(lines)
-
-
-def main(dir_path: str, image_path: str):
-    """
-    调试主函数：读取图片，识别网格和单位，输出调试图像
-
-    Args:
-        dir_path: 测试图片所在文件夹路径
-        image_path: 测试图片文件名
-    """
-    import cv2
-    import os
-
-    full_image_path = os.path.join(dir_path, image_path)
-    debug_dir = dir_path
-
-    print(f"读取图片: {full_image_path}", flush=True)
-    if not os.path.exists(full_image_path):
-        print(f"图片文件不存在: {full_image_path}", flush=True)
-        return
-
-    image = cv2.imread(full_image_path)
-    if image is None:
-        print(f"无法读取图片: {full_image_path}", flush=True)
-        return
-
-    print(f"图片读取成功，尺寸: {image.shape}", flush=True)
-
-    print("开始识别...", flush=True)
-    recognizer = BattleGridRecognizer()
-    grid = recognizer.recognize(image, debug_dir)
-
-    output_path = os.path.join(debug_dir, image_path.rsplit(".", 1)[0] + "_debug.png")
-    print(f"生成调试图像: {output_path}", flush=True)
-    draw_battle_grid_debug(image, grid, output_path)
-
-    report = grid_to_text_report(grid)
-    print(report, flush=True)
-    print(f"\n调试图像已保存到: {output_path}", flush=True)
-
-
-# if __name__ == "__main__":
-#     TEST_DIR_PATH = r"F:\workspace\MAAGC\assets\resource\base\image\Fight"
-#     TEST_IMAGE_PATH = r"1.png"
-#     main(TEST_DIR_PATH, TEST_IMAGE_PATH)

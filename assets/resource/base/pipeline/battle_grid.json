@@ -1,0 +1,158 @@
+{
+    "Battle_ThreatRegion": {
+        "recognition": "ColorMatch",
+        "roi": [
+            0,
+            0,
+            720,
+            1160
+        ],
+        "method": 40,
+        "upper": [
+            20,
+            200,
+            165
+        ],
+        "lower": [
+            2,
+            130,
+            75
+        ],
+        "count": 10,
+        "connected": true,
+        "timeout": 3000,
+        "post_delay": 500
+    },
+    "Battle_UnitScan_OCR": {
+        "recognition": "OCR",
+        "roi": [
+            0,
+            0,
+            720,
+            1160
+        ],
+        "expected": [],
+        "timeout": 5000,
+        "post_delay": 500
+    },
+    "Battle_UnitScan_Blue": {
+        "recognition": "ColorMatch",
+        "roi": [
+            0,
+            0,
+            720,
+            1160
+        ],
+        "method": 40,
+        "lower": [
+            100,
+            180,
+            140
+        ],
+        "upper": [
+            102,
+            198,
+            220
+        ],
+        "count": 20,
+        "connected": true,
+        "timeout": 3000,
+        "post_delay": 500
+    },
+    "Battle_UnitScan_Red": {
+        "recognition": "ColorMatch",
+        "roi": [
+            0,
+            0,
+            720,
+            1160
+        ],
+        "method": 40,
+        "lower": [
+            0,
+            148,
+            164
+        ],
+        "upper": [
+            8,
+            216,
+            243
+        ],
+        "count": 20,
+        "connected": true,
+        "timeout": 3000,
+        "post_delay": 500
+    },
+    "Battle_UnitScan_Green": {
+        "recognition": "ColorMatch",
+        "roi": [
+            0,
+            0,
+            720,
+            1160
+        ],
+        "method": 40,
+        "lower": [
+            65,
+            190,
+            130
+        ],
+        "upper": [
+            75,
+            220,
+            175
+        ],
+        "count": 20,
+        "connected": true,
+        "timeout": 3000,
+        "post_delay": 500
+    },
+    "Battle_MoveRange": {
+        "recognition": "ColorMatch",
+        "roi": [
+            0,
+            0,
+            720,
+            1160
+        ],
+        "method": 40,
+        "lower": [
+            75,
+            150,
+            110
+        ],
+        "upper": [
+            114,
+            225,
+            198
+        ],
+        "count": 50,
+        "connected": true,
+        "timeout": 3000,
+        "post_delay": 500
+    },
+    "Battle_AttackRange": {
+        "recognition": "ColorMatch",
+        "roi": [
+            0,
+            0,
+            720,
+            1160
+        ],
+        "method": 40,
+        "lower": [
+            15,
+            164,
+            121
+        ],
+        "upper": [
+            33,
+            223,
+            188
+        ],
+        "count": 50,
+        "connected": true,
+        "timeout": 3000,
+        "post_delay": 500
+    }
+}
