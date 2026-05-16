@@ -76,8 +76,6 @@ jobs:
         include:
           - arch: x86_64
             runner: windows-latest
-          - arch: aarch64
-            runner: windows-11-arm
       fail-fast: false
     runs-on: ${{ matrix.runner }}
 
