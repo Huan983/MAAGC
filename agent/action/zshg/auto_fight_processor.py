@@ -1,17 +1,13 @@
-import numpy as np
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
 from typing import List, Optional
 from maa.agent.agent_server import AgentServer
 from maa.context import Context
 from maa.custom_action import CustomAction
 from utils import logger
+import time
 
-from .battle_grid import BattleGrid, Cell, CellType
-
-
-# 右上角空白区域（取消选择）
-CANCEL_AREA = (600, 0, 100, 100)
+from .battle_grid import BattleGrid, Cell, CellType, GridScanner, ROWS, COLS
 
 
 class FightPhase(Enum):
@@ -21,7 +17,6 @@ class FightPhase(Enum):
 
 @dataclass
 class CharacterState:
-    """角色状态"""
     cell: Cell
     has_acted: bool = False
 
@@ -32,6 +27,7 @@ class AutoFightProcessor(CustomAction):
 
     def __init__(self) -> None:
         super().__init__()
+        self.scanner = GridScanner()
 
     def run(
         self, context: Context, argv: CustomAction.RunArg
@@ -49,19 +45,16 @@ class AutoFightProcessor(CustomAction):
                 break
 
             if phase == FightPhase.DETECTION:
-                # ===== 检测阶段 =====
                 logger.info("=== 检测阶段 ===")
 
-                # 创建 BattleGrid（默认 10x6 网格）
                 if grid is None:
-                    grid = BattleGrid.create_default()
+                    grid = BattleGrid()
 
-                # 检测所有格子中的单位
-                grid.detect(context)
+                # 扫描所有格子识别单位
+                self.scanner.scan_grid(grid, context)
 
-                logger.info(f"战场识别: {grid.COLS}x{grid.ROWS} 网格")
+                logger.info(f"战场识别: {COLS}x{ROWS} 网格")
 
-                # 构建我方角色列表
                 allies = [
                     CharacterState(cell=cell, has_acted=False)
                     for cell in grid.self_units
@@ -76,7 +69,6 @@ class AutoFightProcessor(CustomAction):
                 current_ally_index = 0
 
             elif phase == FightPhase.ACTION:
-                # ===== 行动阶段 =====
                 logger.info("=== 行动阶段 ===")
 
                 if context.tasker.stopping:
@@ -91,7 +83,17 @@ class AutoFightProcessor(CustomAction):
                         break
 
                 if current_ally is None:
-                    logger.info("所有角色已行动完毕，本回合结束")
+                    logger.info("所有角色已行动完毕，点击结束回合")
+
+                    # ============================================================
+                    # ⑲ 等待敌方回合 - 点击结束回合按钮让敌方行动
+                    # ============================================================
+                    context.run_task("FightEndRound")
+                    time.sleep(8)  # 敌方行动时间
+
+                    # ============================================================
+                    # 22 下一回合，回到检测阶段
+                    # ============================================================
                     phase = FightPhase.DETECTION
                     continue
 
@@ -100,62 +102,130 @@ class AutoFightProcessor(CustomAction):
                     f"选择角色 {current_ally_index}: grid=({ally_cell.row},{ally_cell.col})"
                 )
 
-                # 1. 点击我方单位
-                click_x, click_y = ally_cell.rect.center()
+                # 1. 点击我方单位（用实际识别到的单位位置）
+                if ally_cell.unit_center != (0, 0):
+                    click_x, click_y = ally_cell.unit_center
+                else:
+                    click_x, click_y = ally_cell.rect.center()
                 logger.info(f"点击我方坐标: ({click_x}, {click_y})")
                 self._click_unit_and_wait(context, click_x, click_y)
 
-                # 2. 截图检测攻击/移动范围
-                self._scan_range(context, grid)
+                # 2. 扫描攻击/移动范围
+                grid.reset_flags()
+                self.scanner.scan_ranges(grid, context)
 
-                # 3. 判断可攻击的敌人格子
-                attackable_cells = [
-                    cell
-                    for cell in grid.enemy_units
-                    if cell.is_attackable
+                # ============================================================
+                # ⑥ 构建统一矩阵（合并检测+范围）
+                # ============================================================
+                matrix_lines = []
+                for r in range(ROWS):
+                    row_vals = []
+                    for c in range(COLS):
+                        cell = grid.cells[r][c]
+
+                        # 确定基础标记
+                        if r == ally_cell.row and c == ally_cell.col:
+                            base = "A"  # 当前选中
+                        elif cell.cell_type == CellType.ENEMY:
+                            base = "E"
+                        elif cell.cell_type == CellType.FRIEND:
+                            base = "F"
+                        elif cell.cell_type == CellType.SELF:
+                            base = "S"
+                        elif cell.have_person:
+                            base = "?"
+                        else:
+                            base = "0"
+
+                        # 叠加范围标记
+                        marker = base
+                        if cell.is_attackable:
+                            marker += "1"
+                        if cell.is_moveable:
+                            marker += "2"
+
+                        row_vals.append(marker)
+                    matrix_lines.append(" ".join(row_vals))
+                logger.info(
+                    f"统一矩阵 (A=当前, E=敌人, F=友军, S=我方, 1=可攻击, 2=可移动):\n"
+                    + "\n".join(matrix_lines)
+                )
+
+                # ============================================================
+                # ⑬ 决策执行: 攻击 > 移动 > 待机
+                # ============================================================
+
+                # 攻击目标: cell_type==ENEMY 且 is_attackable==True (即 E1)
+                attack_targets = [
+                    (r, c)
+                    for r in range(ROWS)
+                    for c in range(COLS)
+                    if grid.cells[r][c].cell_type == CellType.ENEMY
+                    and grid.cells[r][c].is_attackable
                 ]
+                logger.info(f"可攻击敌人位置(E1): {attack_targets}")
 
-                if attackable_cells:
-                    # 能攻击 - 找距离最近的敌人进行攻击
-                    target_cell = min(
-                        attackable_cells,
-                        key=lambda c: abs(c.row - ally_cell.row) + abs(c.col - ally_cell.col),
+                if attack_targets:
+                    # 选择最近的敌人攻击
+                    target_row, target_col = min(
+                        attack_targets,
+                        key=lambda p: abs(p[0] - ally_cell.row)
+                        + abs(p[1] - ally_cell.col),
                     )
-                    logger.info(
-                        f"攻击目标格子: ({target_cell.row}, {target_cell.col})"
-                    )
+                    target_cell = grid.cells[target_row][target_col]
+                    logger.info(f"攻击目标格子: ({target_cell.row}, {target_cell.col})")
                     self._attack_cell(context, target_cell)
-                    self._click_cancel(context)
+                    context.run_task("Battle_Cancel")
                     current_ally.has_acted = True
                 else:
-                    # 不能攻击 - 找可移动的空格子，且离敌人最近
-                    moveable_cells = [
-                        grid.cells[r][c]
-                        for r in range(grid.ROWS)
-                        for c in range(grid.COLS)
+                    # 移动目标: is_moveable 且空白 (即 2)
+                    move_targets = [
+                        (r, c)
+                        for r in range(ROWS)
+                        for c in range(COLS)
                         if grid.cells[r][c].is_moveable
                         and not grid.cells[r][c].have_person
                     ]
+                    logger.info(f"可移动空白位置(2): {move_targets}")
 
-                    best_cell = None
-                    min_dist = float("inf")
-
-                    for cell in moveable_cells:
-                        # 计算到所有敌人的最小距离
-                        for enemy_cell in grid.enemy_units:
-                            dist = abs(cell.row - enemy_cell.row) + abs(cell.col - enemy_cell.col)
-                            if dist < min_dist:
-                                min_dist = dist
-                                best_cell = cell
-
-                    if best_cell:
-                        logger.info(f"移动到 ({best_cell.row}, {best_cell.col})")
-                        self._move_to_cell(context, best_cell)
-                        self._click_cancel(context)
+                    if not move_targets:
+                        logger.info("没有可移动位置，原地待机")
+                        context.run_task("Battle_Cancel")
                         current_ally.has_acted = True
                     else:
-                        logger.info("找不到合适的移动位置，原地待机")
-                        self._click_cancel(context)
+                        # 推断敌人位置: 所有 ENEMY 格子
+                        enemy_positions = {
+                            (r, c)
+                            for r in range(ROWS)
+                            for c in range(COLS)
+                            if grid.cells[r][c].cell_type == CellType.ENEMY
+                        }
+
+                        best_cell = None
+                        best_score = float("inf")
+
+                        for r, c in move_targets:
+                            cell = grid.cells[r][c]
+                            if enemy_positions:
+                                min_dist = min(
+                                    abs(r - er) + abs(c - ec)
+                                    for er, ec in enemy_positions
+                                )
+                            else:
+                                min_dist = float("inf")
+
+                            if min_dist < best_score:
+                                best_score = min_dist
+                                best_cell = cell
+
+                        if best_cell:
+                            logger.info(f"移动到 ({best_cell.row}, {best_cell.col})")
+                            self._move_to_cell(context, best_cell)
+                            context.run_task("Battle_Cancel")
+                        else:
+                            logger.info("找不到合适的移动位置，原地待机")
+                            context.run_task("Battle_Cancel")
+
                         current_ally.has_acted = True
 
                 current_ally_index += 1
@@ -163,70 +233,28 @@ class AutoFightProcessor(CustomAction):
         logger.info("战斗流程结束")
         return CustomAction.RunResult(success=True)
 
-    def _click_unit_and_wait(self, context: Context, x: int, y: int):
-        """点击单位并等待范围显示"""
+    def _click_unit_and_wait(self, context: Context, x: int, y: int) -> None:
         context.tasker.controller.post_click(x, y).wait()
-        import time
         time.sleep(1.0)
 
-    def _scan_range(self, context: Context, grid: BattleGrid):
-        """扫描攻击和移动范围"""
-        img = context.tasker.controller.post_screencap().wait().get()
-
-        # 检测攻击范围（红色）
-        reco = context.run_recognition("Battle_AttackRange", img)
-        if reco and reco.hit and reco.all_results:
-            self._mark_cells_in_range(grid, reco.all_results, "attack")
-
-        # 检测移动范围（绿色）
-        reco = context.run_recognition("Battle_MoveRange", img)
-        if reco and reco.hit and reco.all_results:
-            self._mark_cells_in_range(grid, reco.all_results, "move")
-
-    def _mark_cells_in_range(self, grid: BattleGrid, results, range_type: str):
-        """将识别结果标记到对应格子"""
-        for result in results:
-            if not hasattr(result, "box") or not result.box:
-                continue
-            bx, by, bw, bh = result.box
-
-            # 找到这个检测结果属于哪个格子
-            for r in range(grid.ROWS):
-                for c in range(grid.COLS):
-                    cell = grid.cells[r][c]
-                    # 检查检测结果是否在格子内
-                    if (
-                        bx >= cell.rect.x
-                        and bx + bw <= cell.rect.x + cell.rect.width
-                        and by >= cell.rect.y
-                        and by + bh <= cell.rect.y + cell.rect.height
-                    ):
-                        if range_type == "attack":
-                            cell.is_attackable = True
-                        else:
-                            cell.is_moveable = True
-                        break
-
-    def _move_to_cell(self, context: Context, cell: Cell):
-        """移动到指定格子（快速单击两下）"""
-        x, y = cell.rect.center()
-        logger.info(f"移动点击: ({cell.row}, {cell.col})")
+    def _move_to_cell(self, context: Context, cell: Cell) -> None:
+        """移动到指定格子（双击），使用实际位置或有人的位置"""
+        if cell.unit_center != (0, 0):
+            x, y = cell.unit_center
+        else:
+            x, y = cell.rect.center()
+        logger.info(f"移动点击: ({cell.row}, {cell.col}) -> ({x}, {y})")
         context.tasker.controller.post_click(x, y).wait()
         context.tasker.controller.post_click(x, y).wait()
-        import time
-        time.sleep(0.5)
+        time.sleep(1)
 
-    def _attack_cell(self, context: Context, cell: Cell):
-        """攻击指定格子（快速单击两下）"""
-        x, y = cell.rect.center()
-        logger.info(f"攻击点击: ({cell.row}, {cell.col})")
+    def _attack_cell(self, context: Context, cell: Cell) -> None:
+        """攻击指定格子（双击），使用实际位置或有人的位置"""
+        if cell.unit_center != (0, 0):
+            x, y = cell.unit_center
+        else:
+            x, y = cell.rect.center()
+        logger.info(f"攻击点击: ({cell.row}, {cell.col}) -> ({x}, {y})")
         context.tasker.controller.post_click(x, y).wait()
         context.tasker.controller.post_click(x, y).wait()
-
-    def _click_cancel(self, context: Context):
-        """点击空白区域取消选择"""
-        x, y, w, h = CANCEL_AREA
-        cancel_x = x + w // 2
-        cancel_y = y + h // 2
-        logger.info(f"取消点击坐标: ({cancel_x}, {cancel_y})")
-        context.tasker.controller.post_click(cancel_x, cancel_y).wait()
+        time.sleep(1)

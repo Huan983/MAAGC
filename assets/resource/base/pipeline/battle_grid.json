@@ -23,18 +23,6 @@
         "timeout": 3000,
         "post_delay": 500
     },
-    "Battle_UnitScan_OCR": {
-        "recognition": "OCR",
-        "roi": [
-            0,
-            0,
-            720,
-            1160
-        ],
-        "expected": [],
-        "timeout": 5000,
-        "post_delay": 500
-    },
     "Battle_UnitScan_Blue": {
         "recognition": "ColorMatch",
         "roi": [
@@ -154,5 +142,17 @@
         "connected": true,
         "timeout": 3000,
         "post_delay": 500
+    },
+    "Battle_Cancel": {
+        "recognition": "DirectHit",
+        "target": [
+            650,
+            0,
+            50,
+            50
+        ],
+        "action": "Click",
+        "timeout": 1000,
+        "post_delay": 1000
     }
 }
