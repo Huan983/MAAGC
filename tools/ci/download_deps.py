@@ -80,6 +80,18 @@ def download_dependencies(deps_dir, platform_tag):
         print("错误: requirements.txt 文件不存在")
         return False
 
+    # Windows ARM64 不支持 opencv-python，换用 opencv-python-headless
+    use_headless = False
+    if platform_tag == "win_arm64":
+        requirements_content = requirements_file.read_text(encoding="utf-8")
+        if "opencv-python" in requirements_content and "opencv-python-headless" not in requirements_content:
+            print("Windows ARM64 平台: 将 opencv-python 替换为 opencv-python-headless")
+            use_headless = True
+            requirements_content = requirements_content.replace("opencv-python\n", "opencv-python-headless\n")
+            temp_requirements = deps_path / "requirements_tmp.txt"
+            temp_requirements.write_text(requirements_content, encoding="utf-8")
+            requirements_file = temp_requirements
+
     # 首先尝试下载平台特定的wheel文件
     try:
         cmd = [
