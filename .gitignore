@@ -459,4 +459,5 @@ debug
 .mcp.json
 .claude
 dataset/
-debug_faces
+debug_faces/
+install*/

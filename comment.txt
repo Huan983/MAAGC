@@ -1,7 +1,0 @@
-refactor: 重构好苗子检测逻辑，支持动态启用检测条件
-
-- evaluate_with_config 新增 enabled_condition_ids 参数，支持按条件ID过滤
-- 新增 _get_enabled_condition_ids 从 child_info.json 读取启用状态
-- 新增 _check_and_show_good_child_alert 封装弹窗逻辑
-- 移除 extract_facial_features 函数及相关面部识别功能
-- 清理废弃的配置文件和文档
