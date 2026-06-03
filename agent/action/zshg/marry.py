@@ -652,9 +652,19 @@ class MarryProcessor(CustomAction):
         """保存面部特征识别截图到本地，按种族分文件夹
 
         Args:
-            screenshot: 截图数组（numpy array）
+            screenshot: 截图数组（numpy array，BGR 格式）
             race: 种族名称，默认使用 self._current_race
         """
+        # 前置校验：截图为 None 或维度异常时显式 error，不再静默吞错
+        if screenshot is None:
+            logger.error("[debug_faces] 截图数据为 None，跳过保存")
+            return ""
+        if not hasattr(screenshot, "ndim") or screenshot.ndim != 3 or screenshot.shape[2] not in (3, 4):
+            logger.error(
+                f"[debug_faces] 截图维度异常 shape={getattr(screenshot, 'shape', None)}，跳过保存"
+            )
+            return ""
+
         try:
             # Windows 兼容的时间戳格式
             timestamp = (
@@ -667,18 +677,35 @@ class MarryProcessor(CustomAction):
                 if race
                 else (self._current_race if self._current_race else "unknown")
             )
-            save_dir = Path("debug_faces") / race_folder
+            save_dir = (Path("debug_faces") / race_folder).resolve()
             save_dir.mkdir(parents=True, exist_ok=True)
+            logger.info(f"[debug_faces] 写入目录: {save_dir}")
             filename = f"{timestamp}.png"
             filepath = save_dir / filename
 
-            # BGR 转 RGB，然后用 cv2 保存
-            rgb_screenshot = screenshot[:, :, ::-1]
-            cv2.imwrite(str(filepath), rgb_screenshot)
-            logger.debug(f"截图已保存: {filepath}")
+            # 1) 修正非连续视图：img[y:y+h, x:x+w] 产生带 stride 的视图，
+            #    cv2 编码器对非连续数组在某些版本上会软失败
+            if not screenshot.flags["C_CONTIGUOUS"]:
+                screenshot = screenshot.copy()
+            # 2) 修正非 uint8 dtype：MaaFramework 偶尔返回 float32 / int16
+            if screenshot.dtype != "uint8":
+                screenshot = screenshot.clip(0, 255).astype("uint8")
+            # 3) 修正非 ASCII 路径在 Windows 上的 cv2.imwrite 软失败：
+            #    改用 cv2.imencode + Python open("wb") 走 UTF-8 路径，
+            #    避免 fopen 系统代码页陷阱
+            success, buf = cv2.imencode(".png", screenshot)
+            if not success:
+                logger.error(
+                    f"[debug_faces] cv2.imencode 失败: {filepath} "
+                    f"shape={screenshot.shape} dtype={screenshot.dtype}"
+                )
+                return ""
+            filepath.write_bytes(buf.tobytes())
+            size = filepath.stat().st_size if filepath.exists() else 0
+            logger.info(f"[debug_faces] 已保存: {filepath} ({size} bytes)")
             return str(filepath)
         except Exception as e:
-            logger.warning(f"保存截图失败: {e}")
+            logger.exception(f"[debug_faces] 保存失败 path={filepath}: {e}")
             return ""
 
     def _recognize_face_rating(self, context: Context, profile: "ChatCandidateProfile"):
