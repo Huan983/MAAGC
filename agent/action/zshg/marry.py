@@ -161,7 +161,7 @@ class MarryProcessor(CustomAction):
 
         # 检测是否是多角色相亲，还是单角色相亲
         self._match_scope = self._get_selected_match_scope(context)
-        if self._match_scope == "multi":
+        if self._match_scope:
             execute_result = self._multi_plan(context)
         else:
             execute_result = self._single_plan(context)
