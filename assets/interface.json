@@ -182,7 +182,7 @@
                 }
             ],
             "default_case": [
-                "市场折扣物品",
+                "购买市场折扣物品",
                 "商城免费礼包",
                 "悬赏令领取"
             ]
@@ -438,7 +438,7 @@
         "相亲模式": {
             "type": "select",
             "description": "选择相亲模式",
-            "default_case": "姓名相亲",
+            "default_case": "聊天相亲",
             "cases": [
                 {
                     "name": "姓名相亲",
