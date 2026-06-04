@@ -1,0 +1,25 @@
+{
+    "mcpServers": {
+        "maa-mcp": {
+            "command": "python",
+            "args": [
+                "-m",
+                "maa_mcp"
+            ],
+            "cwd": "f:\\workspace\\MaaMCP",
+            "disabled": true
+        },
+        "MiniMax": {
+            "command": "uvx",
+            "args": [
+                "minimax-coding-plan-mcp",
+                "-y"
+            ],
+            "env": {
+                "MINIMAX_API_KEY": "${MINIMAX_API_KEY}",
+                "MINIMAX_API_HOST": "https://api.minimaxi.com"
+            },
+            "disabled": true
+        }
+    }
+}
