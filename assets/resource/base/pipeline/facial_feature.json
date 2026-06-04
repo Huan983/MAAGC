@@ -60,13 +60,15 @@
     },
     "佩尔面部特征_科内塔之怒": {
         "recognition": "NeuralNetworkDetect",
-        "model": "conetta.onnx",
+        "model": "feature_face.onnx",
         "labels": [
+            "ear",
             "eyebrow_forked",
-            "eyebrow_smooth"
+            "eye",
+            "chin"
         ],
         "expected": [
-            0
+            1
         ],
         "roi": [
             336,
