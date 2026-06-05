@@ -73,8 +73,8 @@ python agent/main.py                              # 运行主程序
 
 ## 必读文档
 
-- `docs/maafw_doc/3.1-任务流水线协议.md` - 任务流水线协议（**新增功能前必读**）
-- `docs/maafw_doc/3.3-ProjectInterfaceV2协议.md` - 外部接口协议（**新增功能前必读**）
+- `docs/maafw_doc/zh_cn/3.1-任务流水线协议.md` - 任务流水线协议（**新增功能前必读**）
+- `docs/maafw_doc/zh_cn/3.3-ProjectInterfaceV2协议.md` - 外部接口协议（**新增功能前必读**）
 - `docs/zh_cn/项目概述.md` - 项目概述与详细架构
 - `docs/zh_cn/设计规范.md` - 数据结构、爵位等级、命名规则
 
@@ -164,16 +164,6 @@ class ParentInfo:
 - **无懈怠**：找出根本原因。不要使用临时修复。遵循高级开发者的标准。
 
 ## 测试技巧
-
-### MaaFW Skill 手册
-
-使用 `.trae/skills/` 下的 skill 手册来开发和测试 pipeline：
-
-| Skill | 用途 | 调用方式 |
-| ----- | --- | ------- |
-| `maafw-pipelinenode` | 编写 pipeline 节点，理解识别/动作类型，设计模式 | 阅读 `.trae/skills/maafw-pipelinenode/SKILL.md` |
-| `pipeline_testing` | 测试单个 pipeline 节点，验证识别/动作是否正常 | 使用 `/test-pipeline` 或阅读 `.trae/skills/pipeline_testing/SKILL.md` |
-| `option-pipeline` | 设计 interface.json 选项（select/switch/input/checkbox） | 阅读 `.trae/skills/option-pipeline/SKILL.md` |
 
 ### Pipeline 测试流程
 

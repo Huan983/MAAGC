@@ -1,6 +1,6 @@
 # 节点测试（Node Testing）
 
-> 用 maa-mcp 逐个测试 Pipeline JSON 中的节点，验证识别和操作是否正常工作。本文档是 [`.claude/skills/pipeline_testing/SKILL.md`](../../../.claude/skills/pipeline_testing/SKILL.md) 的纸质版归档（skill 提供 `/test-pipeline` 命令）。
+> 用 maa-mcp 逐个测试 Pipeline JSON 中的节点，验证识别和操作是否正常工作。本文档是 [`.claude/skills/pipeline-testing/SKILL.md`](../../../.claude/skills/pipeline-testing/SKILL.md) 的纸质版归档（skill 提供 `/test-pipeline` 命令）。
 
 ## 调用方式
 

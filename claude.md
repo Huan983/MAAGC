@@ -73,8 +73,8 @@ python agent/main.py                              # Run main program
 
 ## Required Reading
 
-- `docs/maafw_doc/3.1-任务流水线协议.md` - Task Pipeline Protocol (**必读 before adding new features**)
-- `docs/maafw_doc/3.3-ProjectInterfaceV2协议.md` - External Interface Protocol (**必读 before adding new features**)
+- `docs/maafw_doc/zh_cn/3.1-任务流水线协议.md` - Task Pipeline Protocol (**必读 before adding new features**)
+- `docs/maafw_doc/zh_cn/3.3-ProjectInterfaceV2协议.md` - External Interface Protocol (**必读 before adding new features**)
 - `docs/zh_cn/项目概述.md` - Project overview and detailed architecture
 - `docs/zh_cn/设计规范.md` - Data structures, title levels, naming conventions
 
@@ -164,16 +164,6 @@ class ParentInfo:
 - **No Slack**: Find root causes. Don't use temporary fixes. Follow senior developer standards.
 
 ## Testing Skills
-
-### MaaFW Skill Manuals
-
-Use the skill manuals in `.trae/skills/` for developing and testing pipelines:
-
-| Skill | Purpose | Invocation |
-| ----- | ------ | --------- |
-| `maafw-pipelinenode` | Write pipeline nodes, understand recognition/action types, design patterns | Read `.trae/skills/maafw-pipelinenode/SKILL.md` |
-| `pipeline_testing` | Test individual pipeline nodes, verify recognition/action works | Use `/test-pipeline` or read `.trae/skills/pipeline_testing/SKILL.md` |
-| `option-pipeline` | Design interface.json options (select/switch/input/checkbox) | Read `.trae/skills/option-pipeline/SKILL.md` |
 
 ### Pipeline Testing Workflow
 
