@@ -6,8 +6,8 @@
                 "-m",
                 "maa_mcp"
             ],
-            "cwd": "f:\\workspace\\MaaMCP",
-            "disabled": true
+            "cwd": "f:/workspace/MaaMCP",
+            "disabled": false
         },
         "MiniMax": {
             "command": "uvx",

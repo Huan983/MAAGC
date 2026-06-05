@@ -456,8 +456,7 @@ debug
 .nicegui/
 .vscode/
 .venv/
-.mcp.json
-.claude
+.claude/settings.local.json
 dataset/
 debug_faces/
 install*/

@@ -191,7 +191,10 @@ MAAGC/
 │   └── interface.json        # 接口配置
 ├── deps/                     # 依赖文件
 ├── docs/                     # 项目文档
-│   ├── maafw_doc/            # MAAFW 协议文档
+│   ├── maafw_doc/            # MAAFW 协议文档（镜像自 MaaXYZ/MaaFramework）
+│   │   ├── zh_cn/            # 中文版
+│   │   ├── en_us/            # 英文版
+│   │   └── static/           # 文档图片资源
 │   └── zh_cn/                # 中文文档
 ├── tools/                    # 工具脚本
 └── check_resource.py         # 资源检查脚本
