@@ -434,5 +434,214 @@
             "[JumpBack]FightReusltLevelUp"
         ],
         "timeout": 3000
+    },
+    "ClickGoToArchipelago": {
+        "recognition": "OCR",
+        "expected": [
+            "前往群岛"
+        ],
+        "roi": [
+            297,
+            1228,
+            125,
+            52
+        ],
+        "action": "Click",
+        "post_delay": 500,
+        "timeout": 2000
+    },
+    "CastleSwipeDown": {
+        "action": "Swipe",
+        "begin": [
+            377,
+            800,
+            1,
+            1
+        ],
+        "end": [
+            381,
+            650,
+            1,
+            1
+        ],
+        "post_delay": 1000,
+        "timeout": 2000
+    },
+    "CastleSwipeUp": {
+        "action": "Swipe",
+        "begin": [
+            381,
+            650,
+            1,
+            1
+        ],
+        "end": [
+            377,
+            800,
+            1,
+            1
+        ],
+        "post_delay": 1000,
+        "timeout": 2000
+    },
+    "CastleManage": {
+        "recognition": "OCR",
+        "expected": [
+            "城堡管理"
+        ],
+        "roi": [
+            100,
+            400,
+            520,
+            880
+        ],
+        "order_by": "Vertical",
+        "action": "Click",
+        "post_delay": 1000,
+        "timeout": 2000
+    },
+    "Market": {
+        "recognition": "OCR",
+        "expected": [
+            "市场"
+        ],
+        "roi": [
+            100,
+            400,
+            520,
+            880
+        ],
+        "order_by": "Vertical",
+        "action": "Click",
+        "post_delay": 1000,
+        "timeout": 2000
+    },
+    "Blacksmith": {
+        "recognition": "OCR",
+        "expected": [
+            "铁匠铺"
+        ],
+        "roi": [
+            100,
+            400,
+            520,
+            880
+        ],
+        "order_by": "Vertical",
+        "action": "Click",
+        "post_delay": 1000,
+        "timeout": 2000
+    },
+    "AlchemyWorkshop": {
+        "recognition": "OCR",
+        "expected": [
+            "炼金工坊"
+        ],
+        "roi": [
+            100,
+            400,
+            520,
+            880
+        ],
+        "order_by": "Vertical",
+        "action": "Click",
+        "post_delay": 1000,
+        "timeout": 2000
+    },
+    "TrainingCenter": {
+        "recognition": "OCR",
+        "expected": [
+            "训练所"
+        ],
+        "roi": [
+            100,
+            400,
+            520,
+            880
+        ],
+        "order_by": "Vertical",
+        "action": "Click",
+        "post_delay": 1000,
+        "timeout": 2000
+    },
+    "CastleMainHall": {
+        "recognition": "OCR",
+        "expected": [
+            "城堡主厅"
+        ],
+        "roi": [
+            100,
+            400,
+            520,
+            880
+        ],
+        "order_by": "Vertical",
+        "action": "Click",
+        "post_delay": 1000,
+        "timeout": 2000
+    },
+    "Shrine": {
+        "recognition": "OCR",
+        "expected": [
+            "神殿"
+        ],
+        "roi": [
+            100,
+            400,
+            520,
+            880
+        ],
+        "order_by": "Vertical",
+        "action": "Click",
+        "post_delay": 1000,
+        "timeout": 2000
+    },
+    "Family": {
+        "recognition": "OCR",
+        "expected": [
+            "家族"
+        ],
+        "roi": [
+            100,
+            400,
+            520,
+            880
+        ],
+        "order_by": "Vertical",
+        "action": "Click",
+        "post_delay": 1000,
+        "timeout": 2000
+    },
+    "Museum": {
+        "recognition": "OCR",
+        "expected": [
+            "藏馆"
+        ],
+        "roi": [
+            100,
+            400,
+            520,
+            880
+        ],
+        "order_by": "Vertical",
+        "action": "Click",
+        "post_delay": 1000,
+        "timeout": 2000
+    },
+    "Manor": {
+        "recognition": "OCR",
+        "expected": [
+            "庄园"
+        ],
+        "roi": [
+            100,
+            400,
+            520,
+            880
+        ],
+        "order_by": "Vertical",
+        "action": "Click",
+        "post_delay": 1000,
+        "timeout": 2000
     }
 }
