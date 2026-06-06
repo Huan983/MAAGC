@@ -1,6 +1,8 @@
 # docs
 docs/node_modules
 docs/.vuepress/.temp
+# 自动生成的状态机图谱(由 tools/pipeline_to_mermaid.py 重新生成)
+docs/zh_cn/graph/
 # Prerequisites
 *.d
 

@@ -196,9 +196,58 @@ MAAGC/
 │   │   ├── en_us/            # 英文版
 │   │   └── static/           # 文档图片资源
 │   └── zh_cn/                # 中文文档
+│       └── graph/            # 🆕 自动生成的状态机图谱(HTML,gitignore)
 ├── tools/                    # 工具脚本
+│   ├── pipeline_to_mermaid.py  # 🆕 状态机图谱生成器
+│   ├── update_graph.bat        # 🆕 Windows 一键重生成
+│   └── update_graph.sh         # 🆕 bash 一键重生成
 └── check_resource.py         # 资源检查脚本
 ```
+
+### 🗺️ Pipeline 状态机图谱
+
+调试/重构 Pipeline 时,看一堆 JSON `next` 引用容易迷失。本仓库自带**自动生成的状态机图谱**,把以下三类关系一目了然地画出来:
+
+- **Pipeline 节点间 `next` 转移** (真·FSM 状态转移)
+- **Pipeline 节点间 `[JumpBack]` 调用** (子例程调用,执行后返回)
+- **Python `context.run_task()` → Pipeline 节点** (Python 调度层)
+- **`interface.json` 用户级入口 → Pipeline 节点** (MaaPiCli 暴露的入口)
+
+#### 一键生成
+
+```bash
+python tools/pipeline_to_mermaid.py
+```
+
+跑完打开 [docs/zh_cn/graph/index.html](docs/zh_cn/graph/index.html) 即可浏览全貌。产物包括:
+
+- `index.html` — 主目录(卡片导航 + 全局统计)
+- `pipeline_overview.html` — 全局状态机(`stateDiagram-v2`,13 个文件作为复合状态)
+- `pipeline_external_entries.html` — Python → Pipeline 调用图(flowchart)
+- `pipeline_utility_usage.html` — 工具节点反向引用图(flowchart)
+- `pipeline_<file>.html` × 13 — 单文件状态机细节
+
+#### 可选参数
+
+```bash
+python tools/pipeline_to_mermaid.py --open    # 跑完自动在浏览器打开
+python tools/pipeline_to_mermaid.py --watch   # Watch 模式,文件变更自动重生成
+```
+
+Windows 等价命令:`tools\update_graph.bat --open`
+
+#### 工作流
+
+1. 改了 `assets/resource/base/pipeline/*.json` 或 `agent/**/*.py`
+2. 跑 `python tools/pipeline_to_mermaid.py` (或 watch 模式)
+3. 浏览器 Ctrl+R 刷新 `docs/zh_cn/graph/index.html` 看效果
+
+#### 特性
+
+- **零依赖** (纯 Python stdlib,无需 `pip install`)
+- **自动重扫** Pipeline JSON、`interface.json`、`agent/**/*.py`,新增/删除节点无需注册
+- **已被 .gitignore** (`docs/zh_cn/graph/` 整目录),各跑各的不冲突
+- 页面带顶部导航栏,可在 16 张图之间互跳,无需重新打开文件
 
 ### 贡献指南
 
