@@ -13,40 +13,6 @@
         "expected": "城堡",
         "timeout": 2000
     },
-    "CastleSwipeDown": {
-        "action": "Swipe",
-        "begin": [
-            377,
-            800,
-            1,
-            1
-        ],
-        "end": [
-            381,
-            650,
-            1,
-            1
-        ],
-        "post_delay": 1000,
-        "timeout": 2000
-    },
-    "CastleSwipeUp": {
-        "action": "Swipe",
-        "begin": [
-            381,
-            650,
-            1,
-            1
-        ],
-        "end": [
-            377,
-            800,
-            1,
-            1
-        ],
-        "post_delay": 1000,
-        "timeout": 2000
-    },
     "CastleHall": {
         "next": [
             "CastleMarryWindow",

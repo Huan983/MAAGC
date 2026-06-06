@@ -62,6 +62,12 @@
     "Flag_EnableMarryTask": {
         "enabled": true
     },
+    "Flag_EnableSailingFestivalPurchase": {
+        "enabled": true
+    },
+    "Flag_AutoNameChild": {
+        "enabled": true
+    },
     "Auto_WeddingTask": {
         "recognition": "DirectHit",
         "action": "Custom",

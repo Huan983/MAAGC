@@ -54,7 +54,9 @@
             "entry": "Auto_YearlyTask",
             "option": [
                 "开启5月城堡相亲",
+                "开启3月启航节购买",
                 "开启好娃提醒",
+                "开启生娃自动起名",
                 "选择刷取任务国家",
                 "相亲模式",
                 "选择年度任务月份数",
@@ -74,7 +76,9 @@
                 "",
                 "**选项说明：**",
                 "- 开启5月城堡相亲：5月是否自动处理城堡相亲事件",
+                "- 开启3月启航节购买：3月启航节是否自动进入节日页面并购买物品",
                 "- 开启好娃提醒：检测到优质子女时弹窗提醒并暂停任务",
+                "- 开启生娃自动起名：佣兵生娃事件后是否自动识别属性并起名（关闭则保留游戏默认名字，不做属性识别）",
                 "- 选择刷取任务国家：设置年度任务执行的目标城市",
                 "- 相亲模式：姓名相亲（按血统匹配姓名）/ 聊天相亲（按特性匹配） 标记星星的不相亲",
                 "- 选择年度任务月份数：设置执行任务的月份数量",
@@ -212,6 +216,31 @@
             ],
             "default_case": "Yes"
         },
+        "开启3月启航节购买": {
+            "type": "switch",
+            "description": "是否开启3月启航节自动购买物品",
+            "cases": [
+                {
+                    "name": "Yes",
+                    "description": "开启3月启航节自动购买",
+                    "pipeline_override": {
+                        "Flag_EnableSailingFestivalPurchase": {
+                            "enabled": true
+                        }
+                    }
+                },
+                {
+                    "name": "No",
+                    "description": "关闭3月启航节自动购买",
+                    "pipeline_override": {
+                        "Flag_EnableSailingFestivalPurchase": {
+                            "enabled": false
+                        }
+                    }
+                }
+            ],
+            "default_case": "Yes"
+        },
         "开启好娃提醒": {
             "type": "checkbox",
             "description": "是否开启好娃提醒,提醒时弹窗并结束任务",
@@ -239,6 +268,31 @@
                 "科内塔之怒",
                 "太阳+科内塔之怒"
             ]
+        },
+        "开启生娃自动起名": {
+            "type": "switch",
+            "description": "佣兵生娃事件后是否自动识别属性并起名（关闭则保留游戏默认名字）",
+            "cases": [
+                {
+                    "name": "Yes",
+                    "description": "开启自动起名：识别属性 + 命名 + 好苗子检测",
+                    "pipeline_override": {
+                        "Flag_AutoNameChild": {
+                            "enabled": true
+                        }
+                    }
+                },
+                {
+                    "name": "No",
+                    "description": "关闭自动起名：直接点确认，保留游戏默认名字",
+                    "pipeline_override": {
+                        "Flag_AutoNameChild": {
+                            "enabled": false
+                        }
+                    }
+                }
+            ],
+            "default_case": "Yes"
         },
         "选择刷取任务国家": {
             "type": "select",

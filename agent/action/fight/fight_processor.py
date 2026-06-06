@@ -90,7 +90,13 @@ def detect_and_manage_event(context: Context, screenshot) -> str:
         return "mercenary_join"
     elif context.run_recognition("Event_MercenaryBaby", screenshot).hit:
         logger.info("检测到佣兵生娃事件")
-        context.run_task("Auto_PannelCheck")
+        AutoNameChild = context.get_node_data("Flag_AutoNameChild").get("enabled")
+        if AutoNameChild:
+            logger.info("佣兵生娃自动起名已开启，执行起名与好苗子检测")
+            context.run_task("Auto_PannelCheck")
+        else:
+            logger.info("佣兵生娃自动起名已关闭，保留游戏默认名字")
+            context.run_task("Event_MercenaryBaby")
         return "mercenary_baby"
     elif context.run_recognition("事件_孩子夭折了", screenshot).hit:
         logger.info("检测到孩子夭折事件")
@@ -168,6 +174,14 @@ def handle_festival_by_month(context: Context, month: int) -> bool:
 
 def handle_sailing_festival(context: Context) -> bool:
     """处理启航节（3月）"""
+    # 检查是否开启了启航节自动购买
+    EnableSailingFestivalPurchase = context.get_node_data(
+        "Flag_EnableSailingFestivalPurchase"
+    ).get("enabled")
+    if not EnableSailingFestivalPurchase:
+        logger.info("启航节自动购买已关闭，跳过")
+        return True
+
     current_month = check_current_month(context)
     if current_month != 3:
         logger.warning(f"当前月份不是3月，而是{current_month}月，跳过启航节")
