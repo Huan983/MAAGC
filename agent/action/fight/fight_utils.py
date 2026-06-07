@@ -201,6 +201,16 @@ def _process_fight(context: Context) -> bool:
     """
     logger.info("====== 战斗阶段 ======")
 
+    _process_pre(context)
+    
+    _process_fighting(context)
+
+    _process_post(context)
+    
+    return True
+
+
+def _process_pre(context:Context):
     if not context.run_recognition(
         "UI_TaskPannelPageClose",
         context.tasker.controller.post_screencap().wait().get(),
@@ -222,6 +232,8 @@ def _process_fight(context: Context) -> bool:
     context.run_task("TaskDetailOpen")
     context.run_task("TaskDetailFight")
 
+
+def _process_fighting(context:Context):
     context.run_task("FightStart")
     round_count = 0
     max_round_warning = 20
@@ -257,6 +269,7 @@ def _process_fight(context: Context) -> bool:
         round_count += 1
         logger.debug(f"战斗中，当前{round_count}回合...")
 
+def _process_post(context:Context):
     # 检测升级技能
     while context.run_recognition(
         "FightResultLearnSkill",
@@ -273,5 +286,3 @@ def _process_fight(context: Context) -> bool:
 
     # 结束确认
     context.run_task("FightResult_ReturnBigMap")
-
-    return True

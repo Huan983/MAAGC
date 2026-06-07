@@ -282,7 +282,10 @@
     },
     "FightVictory": {
         "recognition": "OCR",
-        "expected": "任务完成",
+        "expected": [
+            "完成",
+            "胜利"
+        ],
         "roi": [
             152,
             229,
