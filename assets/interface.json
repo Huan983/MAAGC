@@ -29,10 +29,10 @@
         }
     ],
     "agent": {
-        "child_exec": "./python/python.exe",
+        "child_exec": "python.exe",
         "child_args": [
             "-u",
-            "./agent/main.py"
+            "../agent/main.py"
         ]
     },
     "task": [
@@ -305,7 +305,9 @@
                     "description": "自动接受：直接点确认",
                     "pipeline_override": {
                         "Event_MercenaryJoin": {
-                            "next": ["Event_MercenaryJoinConfirm"]
+                            "next": [
+                                "Event_MercenaryJoinConfirm"
+                            ]
                         }
                     }
                 },
@@ -314,7 +316,9 @@
                     "description": "自动拒绝：直接点取消",
                     "pipeline_override": {
                         "Event_MercenaryJoin": {
-                            "next": ["Event_MercenaryJoinCancel"]
+                            "next": [
+                                "Event_MercenaryJoinCancel"
+                            ]
                         }
                     }
                 }

@@ -399,8 +399,8 @@ def main():
     current_version = read_interface_version()
     is_dev_mode = current_version == "DEBUG"
 
-    # 如果是Linux系统或开发模式，启动虚拟环境
-    if sys.platform.startswith("linux") or is_dev_mode:
+    # 仅在非开发模式下启动虚拟环境（生产环境统一通过 venv 隔离依赖）
+    if not is_dev_mode and sys.platform.startswith("linux"):
         ensure_venv_and_relaunch_if_needed()
 
     check_and_install_dependencies()
