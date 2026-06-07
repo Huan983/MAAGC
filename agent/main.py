@@ -107,7 +107,11 @@ def ensure_venv_and_relaunch_if_needed():
     logger.info(f"正在使用虚拟环境Python重新启动")
 
     try:
-        cmd = [str(python_in_venv)] + sys.argv
+        # 必须用 __file__ 绝对路径，不能用 sys.argv[0] 拼相对路径
+        # 原因：os.chdir(project_root_dir) 已经在第 19 行把 CWD 切到项目根，
+        # 此时 os.path.abspath("../agent/main.py") 会解析到 F:\workspace\agent\main.py（少一层 MAAGC）
+        script_path = current_file_path  # 已在第 13 行通过 os.path.abspath(__file__) 算好
+        cmd = [str(python_in_venv), script_path] + sys.argv[1:]
         logger.info(f"执行命令: {' '.join(cmd)}")
 
         result = subprocess.run(
@@ -400,7 +404,7 @@ def main():
     is_dev_mode = current_version == "DEBUG"
 
     # 仅在非开发模式下启动虚拟环境（生产环境统一通过 venv 隔离依赖）
-    if not is_dev_mode and sys.platform.startswith("linux"):
+    if is_dev_mode or sys.platform.startswith("linux"):
         ensure_venv_and_relaunch_if_needed()
 
     check_and_install_dependencies()
