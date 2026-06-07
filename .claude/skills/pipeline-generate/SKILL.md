@@ -151,6 +151,13 @@ python .claude/skills/pipeline-generate/generate_node.py "角色" UI_RoleListPag
 11. **ROI 上边界 ≤ 元素最小 y**：目标元素在 y=424 时，ROI y 起点必须 ≤ 424，否则切掉顶部导致 OCR 失败。例：原 ROI `[100, 450, ...]` 把"城堡管理"切掉 26px → 改为 `[100, 400, ...]` 通过。
 12. **卡住时截图查看**：节点超时、OCR 找不到、行为异常时，调 `screencap` 看当前屏幕实际状态。可能界面已不在预期页、可能位置已被遮挡。
 
+13. **跨页面流程用 `next` 状态机而非 Python orchestration**：当一个流程涉及多个页面跳转（如：大地图 → 活动入口 → 难度选择 → 队伍 → 战斗），用 MaaFramework 的 `next` + `[JumpBack]` 串节点。**不要**写 Python `for/while` 调 `context.run_task()` 模拟状态机。详见 [.claude/skills/pipeline-option/SKILL.md](../pipeline-option/SKILL.md) 的「不要做 #10」和 [.claude/skills/pipeline-guide/SKILL.md](../pipeline-guide/SKILL.md) 的「跨页面状态机」。
+
+14. **跨文件节点引用在 `run_pipeline` 测试中会失败**：MaaFramework 全局加载时所有 `assets/resource/base/pipeline/*.json` 合并到同一命名空间，`[JumpBack]OtherFileNode` 能解析。但 `run_pipeline` **只加载单文件**，跨文件引用会报"加载 Pipeline 失败"。**应对**：
+    - 单元测试每个节点用 `run_pipeline`（无跨文件依赖的子流程）是 OK 的
+    - 含跨文件引用的状态机流程，集成测试必须用 MaaFramework GUI/CLI 触发
+    - 调试时可考虑 `MaaCli` 命令行运行全 bundle
+
 ### 已验证最优 expand（5 节点实测）
 
 | 节点 | expand | score | 备注 |
@@ -180,3 +187,76 @@ python .claude/skills/pipeline-generate/generate_node.py "角色" UI_RoleListPag
 - 所有节点 ROI 完全相同（`[100, 400, 520, 880]`，覆盖 y=400-1280）
 - 不靠 expand 微调，靠 `expected` 文字差异让 OCR 区分
 - 不放 `next` 链（避免死循环）
+
+---
+
+## 跨页面状态机流程（用 `next` + `[JumpBack]`）
+
+当生成的活动流程需要**跨多个页面跳转**（如：大地图 → 活动入口 → 难度选择 → 队伍 → 战斗），用 MaaFramework 的 `next` + `[JumpBack]` 机制串接各页面节点，**不要写 Python orchestration**。
+
+### 模式：状态机入口节点
+
+```jsonc
+{
+    "MyActivity_Start": {
+        "next": [
+            "MyActivity_TeamReady",                      // 已在队伍配置页 → 点击"进入战斗"
+            "[JumpBack]MyActivity_Difficulty_Select",     // 在难度选择页 → 选难度
+            "[JumpBack]MyActivity_Enter"                 // 在大地图 → 找入口
+        ],
+        "timeout": 10000
+    },
+
+    "MyActivity_Enter": {
+        "next": [
+            "MyActivity_Enter_Click",                    // 找到图标 → 点击
+            "[JumpBack]BigMap_Activity_Resident",         // 切"常驻"tab
+            "[JumpBack]BigMap_Activity"                  // 打开活动页
+        ],
+        "timeout": 10000
+    },
+
+    "MyActivity_EnterBattle": {
+        "recognition": "OCR",
+        "expected": ["进入战斗"],
+        "action": "Click",
+        "next": [
+            "MyActivity_FightStart",                       // 战斗开始
+            "[JumpBack]MyActivity_TravelSelect_Boat",      // 乘船
+            "[JumpBack]MyActivity_TravelSelect_Walk"       // 步行 fallback
+        ]
+    },
+
+    "MyActivity_TravelSelect_Boat": {
+        "recognition": "OCR",
+        "expected": ["确定"],
+        "roi": [490, 740, 100, 80],                     // 窄 ROI 限定乘船行
+        "action": "Click"
+    },
+
+    "MyActivity_TravelSelect_Walk": {
+        "recognition": "OCR",
+        "expected": ["确定"],
+        "roi": [490, 590, 100, 80],                     // 窄 ROI 限定步行行
+        "action": "Click"
+    }
+}
+```
+
+### 关键设计要点
+
+1. **`[JumpBack]` 是状态回退的关键**：命中后执行完节点链，自动返回父节点的 `next` 继续。
+2. **窄 ROI 区分同名字段**：用 y 范围 [490, 740, 100, 80] vs [490, 590, 100, 80] 区分两个"确定"按钮行（y 范围不重叠）。
+3. **`target_offset` 偏移点击**：识别难度文字后用 `target_offset: [270, 0, 0, 0]` 把点击位置右移到"确定"按钮上。
+4. **跨文件节点引用**：MaaFramework 全局加载会合并所有 `pipeline/*.json`，所以 `[JumpBack]BigMap_Activity`（在 main_ui.json）能从 growth_trial.json 引用。但 `run_pipeline` 测试只加载单文件，集成测试需用 GUI/CLI。
+
+### 与 Python orchestration 的本质区别
+
+| 状态机（推荐） | Python orchestration（次选） |
+|--------------|--------------------------|
+| 流程推进由 MaaFramework 调度 | 自己写 `for/if` 调度 |
+| 每个节点 `next` 显式声明后继 | Python 函数串行 `run_task` |
+| `[JumpBack]` 自动状态回退 | 手动实现回退逻辑 |
+| 跨页面异常有自然路径 | 需手动 try/except |
+
+详见 [.claude/skills/pipeline-option/SKILL.md](../pipeline-option/SKILL.md) 的「不要做 #10」和 [.claude/skills/pipeline-guide/SKILL.md](../pipeline-guide/SKILL.md) 的「跨页面状态机」典型模式。
