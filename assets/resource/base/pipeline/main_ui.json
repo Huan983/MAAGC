@@ -596,6 +596,82 @@
     "post_delay": 200,
     "timeout": 2000
   },
+  "BigMap_Activity": {
+    "recognition": "TemplateMatch",
+    "template": [
+      "UI/activity.png"
+    ],
+    "roi": [
+      30,
+      95,
+      124,
+      321
+    ],
+    "action": "Click",
+    "post_delay": 500,
+    "timeout": 2000,
+    "focus": {
+      "Node.Action.Succeeded": {
+        "content": "进入活动",
+        "display": [
+          "log",
+          "modal"
+        ]
+      },
+      "Node.Action.Failed": {
+        "content": "进入活动失败",
+        "display": [
+          "log",
+          "modal"
+        ]
+      }
+    }
+  },
+  "BigMap_Activity_Resident": {
+    "recognition": "OCR",
+    "expected": [
+      "常驻"
+    ],
+    "roi": [
+      21,
+      46,
+      685,
+      133
+    ],
+    "action": "Click",
+    "post_delay": 500,
+    "timeout": 2000
+  },
+  "BigMap_Activity_TimeLimit": {
+    "recognition": "OCR",
+    "expected": [
+      "限时"
+    ],
+    "roi": [
+      21,
+      46,
+      685,
+      133
+    ],
+    "action": "Click",
+    "post_delay": 500,
+    "timeout": 2000
+  },
+  "BigMap_Activity_GiftPackage": {
+    "recognition": "OCR",
+    "expected": [
+      "礼包"
+    ],
+    "roi": [
+      21,
+      46,
+      685,
+      133
+    ],
+    "action": "Click",
+    "post_delay": 500,
+    "timeout": 2000
+  },
   "UI_PopInform": {
     "focus": {
       "Node.Action.Succeeded": {

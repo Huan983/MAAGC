@@ -68,6 +68,9 @@
     "Flag_AutoNameChild": {
         "enabled": true
     },
+    "Flag_GrowthTrialMode": {
+        "enabled": false
+    },
     "Auto_WeddingTask": {
         "recognition": "DirectHit",
         "action": "Custom",

@@ -59,6 +59,7 @@
                 "开启生娃自动起名",
                 "开启自动接受佣兵",
                 "选择刷取任务国家",
+                "选择成长试炼难度",
                 "相亲模式",
                 "选择年度任务月份数",
                 "自定义任务黑名单"
@@ -81,7 +82,8 @@
                 "- 开启好娃提醒：检测到优质子女时弹窗提醒并暂停任务",
                 "- 开启生娃自动起名：佣兵生娃事件后是否自动识别属性并起名（关闭则保留游戏默认名字，不做属性识别）",
                 "- 开启自动接受佣兵：佣兵申请加入时是否自动接受（关闭则直接拒绝）",
-                "- 选择刷取任务国家：设置年度任务执行的目标城市",
+                "- 选择刷取任务国家：设置年度任务执行的目标城市（选择'暮角城成长试炼'可启动特殊战斗任务流程）",
+                "- 选择成长试炼难度：成长试炼的难度等级（仅在'暮角城成长试炼'模式下生效）",
                 "- 相亲模式：姓名相亲（按血统匹配姓名）/ 聊天相亲（按特性匹配） 标记星星的不相亲",
                 "- 选择年度任务月份数：设置执行任务的月份数量",
                 "- 自定义任务黑名单：屏蔽不需要执行的任务名称",
@@ -391,6 +393,65 @@
                     "pipeline_override": {
                         "EnterCity": {
                             "expected": "奥克尼尼"
+                        }
+                    }
+                },
+                {
+                    "name": "成长试炼",
+                    "description": "在暮角城北边寻找'成长试炼'入口并进入（特殊战斗任务）",
+                    "pipeline_override": {
+                        "EnterCity": {
+                            "expected": "暮角城"
+                        },
+                        "Flag_GrowthTrialMode": {
+                            "enabled": true
+                        }
+                    }
+                }
+            ]
+        },
+        "选择成长试炼难度": {
+            "type": "select",
+            "description": "选择成长试炼的难度等级（仅在'暮角城成长试炼'模式下生效）",
+            "default_case": "噩梦",
+            "cases": [
+                {
+                    "name": "简单",
+                    "pipeline_override": {
+                        "GrowthTrial_Difficulty_Select": {
+                            "expected": [
+                                "简单"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "普通",
+                    "pipeline_override": {
+                        "GrowthTrial_Difficulty_Select": {
+                            "expected": [
+                                "普通"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "困难",
+                    "pipeline_override": {
+                        "GrowthTrial_Difficulty_Select": {
+                            "expected": [
+                                "困难"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "噩梦",
+                    "pipeline_override": {
+                        "GrowthTrial_Difficulty_Select": {
+                            "expected": [
+                                "噩梦"
+                            ]
                         }
                     }
                 }
