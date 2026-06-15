@@ -166,9 +166,9 @@
         "template": "UI/TaskQuickLocation.png",
         "roi": [
             0,
-            651,
+            550,
             307,
-            499
+            600
         ],
         "action": "Click",
         "post_delay": 500,
@@ -284,7 +284,7 @@
         "recognition": "OCR",
         "expected": [
             "完成",
-            "胜利"
+            "战斗胜利"
         ],
         "roi": [
             152,
