@@ -276,7 +276,62 @@
         ],
         "action": "Click",
         "post_delay": 500,
-        "timeout": 2000
+        "timeout": 2000,
+        "next": [
+            "CheckInvalidName"
+        ]
+    },
+    "CheckInvalidName": {
+        "recognition": "OCR",
+        "expected": [
+            "重新取名",
+            "不规范",
+            "不能超过"
+        ],
+        "roi": [
+            36,
+            455,
+            640,
+            332
+        ],
+        "post_delay": 500,
+        "timeout": 2000,
+        "next": [
+            "InvalidNameConfirm"
+        ]
+    },
+    "InvalidNameConfirm": {
+        "recognition": "OCR",
+        "expected": [
+            "确定"
+        ],
+        "roi": [
+            36,
+            455,
+            640,
+            332
+        ],
+        "action": "Click",
+        "post_delay": 500,
+        "timeout": 2000,
+        "next": [
+            "DiceRandomName"
+        ]
+    },
+    "DiceRandomName": {
+        "recognition": "DirectHit",
+        "action": "Click",
+        "target": [
+            652,
+            1111,
+            1,
+            1
+        ],
+        "post_delay": 800,
+        "timeout": 2000,
+        "next": [
+            "PannelChildSetNameConfirm"
+        ]
     },
     "Auto_PannelCheck": {
         "recognition": "DirectHit",
