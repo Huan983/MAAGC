@@ -278,10 +278,23 @@
         "post_delay": 500,
         "timeout": 2000,
         "next": [
-            "CheckInvalidName"
+            "CheckNameGood",
+            "[JumpBack]CheckNameInvalid"
         ]
     },
-    "CheckInvalidName": {
+    "CheckNameGood": {
+        "recognition": "OCR",
+        "expected": [
+            "第[0-9]+个孩子"
+        ],
+        "roi": [
+            56,
+            480,
+            604,
+            97
+        ]
+    },
+    "CheckNameInvalid": {
         "recognition": "OCR",
         "expected": [
             "重新取名",
@@ -294,13 +307,11 @@
             640,
             332
         ],
-        "post_delay": 500,
-        "timeout": 2000,
         "next": [
-            "InvalidNameConfirm"
+            "CheckNameInvalidConfirm"
         ]
     },
-    "InvalidNameConfirm": {
+    "CheckNameInvalidConfirm": {
         "recognition": "OCR",
         "expected": [
             "确定"
@@ -315,23 +326,30 @@
         "post_delay": 500,
         "timeout": 2000,
         "next": [
-            "DiceRandomName"
+            "CheckNameInvalidClickRandom"
         ]
     },
-    "DiceRandomName": {
-        "recognition": "DirectHit",
+    "CheckNameInvalidClickRandom": {
+        "recognition": "OCR",
+        "expected": [
+            "[\u4E00-\u9FFF]+"
+        ],
+        "roi": [
+            253,
+            1051,
+            255,
+            111
+        ],
         "action": "Click",
-        "target": [
-            652,
-            1111,
-            1,
-            1
+        "target": true,
+        "target_offset": [
+            272,
+            0,
+            0,
+            0
         ],
         "post_delay": 800,
-        "timeout": 2000,
-        "next": [
-            "PannelChildSetNameConfirm"
-        ]
+        "timeout": 2000
     },
     "Auto_PannelCheck": {
         "recognition": "DirectHit",
