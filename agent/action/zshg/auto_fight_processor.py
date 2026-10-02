@@ -34,17 +34,27 @@ from .battle_world_map import (
 class AutoFightProcessor(CustomAction):
     """先被动等待反击，超过指定回合后执行主动战斗。
 
-    策略：前 20 轮全部依赖「结束回合 + 自动反击」，让敌人自己走过来；
-    仅当 20 轮后仍未通关时，才进入主动搜索与追击模式。这样可以减少决策
+    策略：前 5 轮全部依赖「结束回合 + 自动反击」，让敌人自己走过来；
+    仅当 5 轮后仍未通关时，才进入主动搜索与追击模式。这样可以减少决策
     次数，避免每局都触发 16 视野螺旋搜索的低性价比操作。
     """
 
     # A battle can legitimately last well beyond the old per-invocation limit
     # of 40.  The session survives recovery calls; this high ceiling is only a
     # final safety fuse, while the normal stop condition is a verified result.
-    MAX_ACTION_CYCLES = 300
+    MAX_ACTION_CYCLES = 120
+    # 回合数硬上限：2026-09-27 实测「海盗侵袭」可打到 173 回合仍不结束
+    # （敌人全部不可见、我方 4 人满血，每回合只点结束回合），此时
+    # _record_round_advance 每回合都在“有进展”，MAX_NO_PROGRESS_CYCLES
+    # 永远不会触发，只能靠这个硬上限兜底。
+    MAX_CONFIRMED_ROUNDS = 40
+    # 战斗内「设置 → 撤退」按钮坐标（720x1280）与撤退确认框的「确定」。
+    # 撤退弹窗原文：撤退人员不会受伤，不会消耗月份。
+    RETREAT_SETTINGS_POINT = (49, 1237)
+    RETREAT_BUTTON_POINT = (360, 721)
+    RETREAT_CONFIRM_POINT = (516, 731)
     MAX_NO_PROGRESS_CYCLES = 12
-    PASSIVE_ROUNDS = 20
+    PASSIVE_ROUNDS = 5
     ACTIVE_FROM_ROUND = PASSIVE_ROUNDS + 1
     TEST_ACTIVE_FROM_ROUND_ENV = "MAAGC_TEST_ACTIVE_FROM_ROUND"
     MAX_SEARCH_SWIPES = 16
@@ -154,6 +164,13 @@ class AutoFightProcessor(CustomAction):
         )
 
         while self._session.action_cycles < self.MAX_ACTION_CYCLES:
+            if self._session.confirmed_rounds >= self.MAX_CONFIRMED_ROUNDS:
+                logger.error(
+                    f"本场战斗已推进 {self._session.confirmed_rounds} 回合仍未结束，"
+                    f"超过上限 {self.MAX_CONFIRMED_ROUNDS}，判定为僵局并主动撤退"
+                )
+                self._retreat_stuck_battle(context)
+                return CustomAction.RunResult(success=False)
             if context.tasker.stopping:
                 logger.info("任务执行被停止")
                 return CustomAction.RunResult(success=False)
@@ -226,8 +243,8 @@ class AutoFightProcessor(CustomAction):
             if battle_result is not None:
                 return CustomAction.RunResult(success=battle_result)
 
-            # 所有任务统一先完整结束 20 个回合。判断依据存放在整场会话中，
-            # AutoFightProcessor 被恢复逻辑再次调用时不会重新等待 20 回合。
+            # 所有任务统一先完整结束 5 个回合。判断依据存放在整场会话中，
+            # AutoFightProcessor 被恢复逻辑再次调用时不会重新等待 5 回合。
             use_active_strategy = self._session.confirmed_rounds >= passive_rounds
             if not use_active_strategy:
                 logger.debug(
@@ -444,6 +461,29 @@ class AutoFightProcessor(CustomAction):
                     and not environment_mode
                     and last_known_enemy_direction is None
                 ):
+                    # 2026-09-26 22:56 实测：海盗侵袭打到第 8 回合、屏幕上还是
+                    # 「你的回合」，这里仅凭一帧里没找到我方单位就判负 →
+                    # 主动战斗被放弃 → 海盗事件「群岛层战斗未成功结束」→
+                    # 切大陆连败 → 「无法到达目标城市: 翠庭」→ 整条 240 月归零。
+                    # 判负前先确认「是否仍在战斗界面」：还在就结束本回合重新建图。
+                    if self._battle_ui_visible(context):
+                        no_progress = self._session.record_no_progress()
+                        logger.warning(
+                            "未发现我方单位但仍在战斗界面，本回合结束等待重新建图 "
+                            f"({no_progress}/{self.MAX_NO_PROGRESS_CYCLES})"
+                        )
+                        if no_progress < self.MAX_NO_PROGRESS_CYCLES:
+                            latest = self._screencap(context)
+                            if latest is not None:
+                                wait_result = self._end_round(
+                                    context, latest, "无我方单位等待"
+                                )
+                                if wait_result is not None:
+                                    return CustomAction.RunResult(
+                                        success=wait_result
+                                    )
+                                self._wait_for_scene_settle(context, timeout=6.0)
+                                continue
                     logger.warning("当前稳定画面未发现我方单位，停止主动战斗")
                     return CustomAction.RunResult(success=False)
                 logger.warning(
@@ -2721,6 +2761,41 @@ class AutoFightProcessor(CustomAction):
             logger.info("识别到战斗胜利结算页，战斗正常结束")
             return True
         return None
+
+    def _battle_ui_visible(self, context: Context) -> bool:
+        """当前画面是否仍在战斗界面（结束回合按钮或「你的回合」横幅）。
+
+        2026-09-26 22:56：海盗侵袭第 8 回合时 `not allies` 分支误判负，
+        用这个判定把「还在战斗」和「已经离开战斗」区分开。
+        """
+        img = self._screencap(context)
+        if img is None:
+            return False
+        if context.run_recognition("FightEndRound", img).hit:
+            return True
+        return context.run_recognition("FightOurRound", img).hit
+
+    def _retreat_stuck_battle(self, context: Context) -> bool:
+        """
+        长回合僵局时主动撤退，让游戏真正离开战斗界面。
+
+        实测（2026-09-27 海盗侵袭卡在 173 回合）：战斗内点
+        「设置 → 撤退 → 确定」即可退出，弹窗原文写明
+        「撤退人员不会受伤，不会消耗月份」，所以撤退是零代价的安全出口。
+        不撤退时游戏会一直停在战斗界面，后续恢复流程会因
+        「右上 Esc 点击失败」耗尽有界步数、进而终止整条年度任务。
+        """
+        for x, y, label in (
+            (*self.RETREAT_SETTINGS_POINT, "战斗设置"),
+            (*self.RETREAT_BUTTON_POINT, "撤退"),
+            (*self.RETREAT_CONFIRM_POINT, "撤退确认"),
+        ):
+            if not self._click_and_log(context, x, y, label):
+                logger.warning(f"僵局撤退：{label} 点击失败，交给上层恢复流程")
+                return False
+            time.sleep(1.2)
+        logger.info("已从僵局战斗撤退，游戏应已回到大地图")
+        return True
 
     def _record_round_advance(self, source: str) -> None:
         if self._session is None:
