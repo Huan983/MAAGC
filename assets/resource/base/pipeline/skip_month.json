@@ -1,0 +1,97 @@
+{
+    "SkipMonth_Rest": {
+        "recognition": "DirectHit",
+        "action": "DoNothing",
+        "next": [
+            "SkipMonth_EnsureMap"
+        ],
+        "focus": "休息跳月入口：任务池里没有可接任务时，先回到大地图，再点沙漏跳过一个月，让游戏时间继续推进"
+    },
+    "SkipMonth_EnsureMap": {
+        "recognition": "OCR",
+        "expected": [
+            "佣兵团"
+        ],
+        "roi": [
+            545,
+            1225,
+            160,
+            60
+        ],
+        "inverse": true,
+        "action": "Click",
+        "target": [
+            652,
+            8,
+            56,
+            50
+        ],
+        "post_delay": 800,
+        "timeout": 2000,
+        "max_hit": 5,
+        "next": [
+            "SkipMonth_EnsureMap",
+            "SkipMonth_Hourglass"
+        ],
+        "focus": "回大地图：右下角「佣兵团」认不到就点右上返回，最多连点5次（任务板→城市菜单→大地图要连点好几次）"
+    },
+    "SkipMonth_Hourglass": {
+        "recognition": "DirectHit",
+        "action": "Click",
+        "target": [
+            62,
+            145,
+            30,
+            30
+        ],
+        "post_delay": 800,
+        "timeout": 2000,
+        "next": [
+            "SkipMonth_RestConfirm"
+        ],
+        "focus": "点击大地图左上角沙漏（休息）"
+    },
+    "SkipMonth_RestConfirm": {
+        "recognition": "OCR",
+        "expected": [
+            "会导致士气下降",
+            "今日剩余时长"
+        ],
+        "roi": [
+            150,
+            570,
+            420,
+            90
+        ],
+        "action": "Click",
+        "target": [
+            481,
+            714,
+            68,
+            37
+        ],
+        "post_delay": 1200,
+        "timeout": 3000,
+        "max_hit": 4,
+        "next": [
+            "SkipMonth_Done",
+            "SkipMonth_RestConfirm"
+        ],
+        "focus": "休息确认弹窗（休息会导致士气下降）里点「确定」，跳过一个月"
+    },
+    "SkipMonth_Done": {
+        "recognition": "OCR",
+        "expected": [
+            "佣兵团"
+        ],
+        "roi": [
+            545,
+            1225,
+            160,
+            60
+        ],
+        "action": "DoNothing",
+        "next": [],
+        "focus": "回到大地图，跳月结束"
+    }
+}
