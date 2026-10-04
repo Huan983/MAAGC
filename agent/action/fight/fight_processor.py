@@ -153,8 +153,19 @@ def _recover_yearly_to_bigmap(context: Context, max_steps: int = YEARLY_RECOVERY
                 return False
             continue
         if state == "battle_fail":
-            logger.error("恢复时识别到战斗失败结算页，不自动重开战斗")
-            return False
+            # 战斗失败结算页：点掉它（FightFail = 模板匹配 UI/FightFail.png + Click），
+            # 然后回到循环继续恢复，最终回到大地图。
+            # 旧行为是直接 return False「不自动重开战斗」，代价是整轮年度任务停在这个
+            # 页面上不动（实测 2026-10-03 第 31/60 个月：40 回合僵局主动撤退 → 判负 →
+            # 弹失败页 → 恢复流程在这里放弃 → 整个 60 个月任务终止）。
+            # 点掉失败页并不消耗任何资源，也不会重开战斗，是安全的。
+            logger.warning("恢复时识别到战斗失败结算页，点掉它后继续恢复")
+            result = context.run_task("FightFail")
+            if not fight_utils._task_succeeded(result):
+                logger.error("战斗失败结算页点击失败，停止恢复")
+                return False
+            time.sleep(0.8)
+            continue
         if state == "travel_dialog":
             # 只走已知的步行兜底，避免在交通资源状态不明时重复购买/消耗。
             result = context.run_task("TravelDialog_ChooseSlow")
