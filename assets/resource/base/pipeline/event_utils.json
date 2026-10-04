@@ -712,7 +712,7 @@
     "Event_PirateRaid_PickArchipelago": {
         "recognition": "OCR",
         "expected": [
-            "瑞格群岛"
+            "帕格维斯"
         ],
         "roi": [
             200,
@@ -722,13 +722,14 @@
         ],
         "action": "Click",
         "target": [
-            250,
-            995,
+            480,
+            1044,
             90,
             90
         ],
-        "post_delay": 800,
-        "timeout": 2000
+        "post_delay": 1200,
+        "timeout": 2000,
+        "focus": "浮窗里选「帕格维斯」（群岛）。expected 由「瑞格群岛」改为「帕格维斯」：浮窗里显示的是岛屿名而不是区域名，旧值永不命中"
     },
     "Event_PirateRaid_RegionSwitch": {
         "recognition": "DirectHit",
@@ -766,13 +767,14 @@
         ],
         "action": "Click",
         "target": [
-            250,
-            995,
+            240,
+            1044,
             90,
             90
         ],
-        "post_delay": 800,
-        "timeout": 2000
+        "post_delay": 1200,
+        "timeout": 2000,
+        "focus": "浮窗里选「加尔提兰」（大陆）。target 对准实测图标中心 (285,1089)：旧值 [250,995,90,90] 的 y 范围是 995~1085，比真实图标高约 50 像素，点不到"
     },
     "Event_PirateRaid_RegionSwitchContinent": {
         "recognition": "DirectHit",
@@ -783,11 +785,12 @@
             50
         ],
         "action": "Click",
-        "post_delay": 800,
+        "post_delay": 1600,
         "timeout": 2000,
         "next": [
             "Event_PirateRaid_PickContinent"
-        ]
+        ],
+        "focus": "点底栏中间的区域格，弹出地区切换浮窗（post_delay 1600ms：实测浮窗弹出动画约 1 秒，原来 800ms 会在动画未完成时就去 OCR 浮窗导致扫空 → 整条跨区域链失败 → 年度任务卡死）"
     },
     "Event_PirateRaid_GoContinent": {
         "recognition": "DirectHit",
