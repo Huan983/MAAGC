@@ -624,24 +624,24 @@
     "ClickGoToContinent": {
         "recognition": "DirectHit",
         "roi": [
-            297,
-            1228,
-            125,
-            52
+            200,
+            1015,
+            350,
+            130
         ],
         "action": "Click",
         "post_delay": 1600,
         "timeout": 2000,
+        "next": [
+            "Event_PirateRaid_PickContinent"
+        ],
+        "focus": "切回大陆：点底栏区域格开浮窗（这一步无文字可识别，只能点固定位置），然后交给 PickContinent 用 OCR 识别「加尔提兰」并点在识别到的文字框上",
         "target": [
             300,
             1230,
             120,
             50
-        ],
-        "next": [
-            "Event_PirateRaid_PickContinent"
-        ],
-        "focus": "切回大陆：点底栏中间的区域格（DirectHit）。原来用 OCR 找「前往大陆」，但游戏底栏从来不显示这四个字（只显示当前区域名：瑞格群岛/加尔提兰），所以该节点永远不命中 —— 实测 2026-10-03 第 31/60 个月就是卡在这里终止"
+        ]
     },
     "CastleSwipeDown": {
         "action": "Swipe",
