@@ -855,7 +855,10 @@ def _run_market_purchases(context: Context, items: list[tuple[str, int]]) -> Non
                 "MarketBread_PickBread": {"expected": [item]}
             }
             if qty > 1:
-                if qty <= MARKET_QTY_MAX:
+                # 上游作者 2026-10-06 review：固定数量控制「很难控制具体数量，建议后期再加」。
+                # 因此本版只保留「买光」路径；下面的分档长按规划保留给后续「数量控制」迭代使用，
+                # 当前一律走 else 分支（弹窗内按「↑」一键买光）。
+                if False and qty <= MARKET_QTY_MAX:
                     # 阶梯规划：长按大档位先冲，零头用单击补。
                     # 实测教训（2026-10-03 买木材 266 个）：按 95% 规划、零头精确补齐，
                     # 实际买到 267 个 —— 长按每档有 ±1 的抖动，7 次长按累计多 1。

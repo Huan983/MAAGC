@@ -623,25 +623,15 @@
     },
     "ClickGoToContinent": {
         "recognition": "DirectHit",
-        "roi": [
-            200,
-            1015,
-            350,
-            130
-        ],
-        "action": "Click",
-        "post_delay": 1600,
-        "timeout": 2000,
+        "action": "DoNothing",
+        "post_delay": 300,
+        "timeout": 3000,
         "next": [
-            "Event_PirateRaid_PickContinent"
+            "MapTabContinent",
+            "Event_PirateRaid_PickContinent",
+            "[JumpBack]Event_PirateRaid_RegionSwitchContinent"
         ],
-        "focus": "切回大陆：点底栏区域格开浮窗（这一步无文字可识别，只能点固定位置），然后交给 PickContinent 用 OCR 识别「加尔提兰」并点在识别到的文字框上",
-        "target": [
-            300,
-            1230,
-            120,
-            50
-        ]
+        "focus": "切回大陆（调度器 + 成功闸门）：① MapTabContinent 用底栏大字判断「已经在大陆」→ 成功收尾；② 否则 PickContinent 用 OCR 点选浮窗里的加尔提兰；③ 都没命中才由 [JumpBack]RegionSwitchContinent 点底栏开窗再回 ②。⚠️ 2026-10-07 实测：原先无成功条件，区域其实已切过去而 OCR 一飘就报 failed，agent 记「切换到大陆层的点击节点未成功」→ 整轮 60 个月归零"
     },
     "CastleSwipeDown": {
         "action": "Swipe",

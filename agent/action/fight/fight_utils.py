@@ -621,6 +621,13 @@ def _accept_new_task(context: Context) -> bool:
     return False
 
 
+# 本月是否已被「休息跳月」消耗掉。跳月本身就把游戏时间推进了一个月，
+# 所以随后必须跳过战斗阶段，不能再去任务板上找一个根本不存在的任务。
+# （上游 review 2026-10-06 指出：原先 _accept_new_task 空手返回 True，
+#   会让上层把「已跳月」当成「已接任务」，接着在无任务状态下找目标并失败。）
+_MONTH_SKIPPED_BY_REST = False
+
+
 def _rest_to_skip_month(context: Context) -> bool:
     """没有可接任务时休息一个月：返回大地图 → 点沙漏 → 确定。
 
@@ -630,7 +637,12 @@ def _rest_to_skip_month(context: Context) -> bool:
     - 取消 [179,715,66,37]、确定 [481,714,68,37]
     休息会消耗当月时长并降低士气，但能让游戏时间继续推进。
     """
-    return _task_succeeded(context.run_task("SkipMonth_Rest"))
+    global _MONTH_SKIPPED_BY_REST
+    ok = _task_succeeded(context.run_task("SkipMonth_Rest"))
+    if ok:
+        # 跳月成功 = 本月已经过去了，标记一下让战斗阶段直接让路
+        _MONTH_SKIPPED_BY_REST = True
+    return ok
 
 
 def _process_fight(context: Context) -> bool:
@@ -643,6 +655,12 @@ def _process_fight(context: Context) -> bool:
     Returns:
         bool: 战斗成功返回 True，失败返回 False
     """
+    global _MONTH_SKIPPED_BY_REST
+    if _MONTH_SKIPPED_BY_REST:
+        _MONTH_SKIPPED_BY_REST = False
+        logger.info("本月已由「休息跳月」消耗，跳过战斗阶段直接进入下一个月")
+        return True
+
     logger.info("====== 战斗阶段 ======")
 
     if not _process_pre(context):

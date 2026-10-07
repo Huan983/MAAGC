@@ -26,11 +26,11 @@
             500,
             146
         ],
-        "action": "LongPress",
-        "duration": 300,
+        "action": "Click",
         "post_delay": 500,
         "timeout": 2000,
-        "focus": "2026-09-26 23:42 实测：「获得 / XX的孩子成年了！可以加入佣兵团」这类弹窗对约 50ms 的短按不生效（管线 Click 连点 12 次弹窗都没关掉），改成 300ms 长按后一次点掉"
+        "focus": "弹窗关闭：改回点按（Click）。上游 2026-10-06 review 指出弹窗不需要长按；原先改成 300ms 长按是因为 2026-09-26 实测短按连点 12 次没关掉弹窗 —— 现改为 Click + max_hit 8 次重试，用重试次数代替按住的时长。",
+        "max_hit": 8
     },
     "Event_MercenaryJoinConfirm": {
         "recognition": "OCR",
@@ -44,11 +44,11 @@
             500,
             146
         ],
-        "action": "LongPress",
-        "duration": 300,
+        "action": "Click",
         "post_delay": 500,
         "timeout": 2000,
-        "focus": "2026-09-26 23:11 实测：游戏字体下 OCR 把「招募」读成「招莫」（得分 0.977）→ 只写「招募」时本节点永不命中；另该弹窗需要 300ms 长按才生效，故同时改 action=LongPress"
+        "focus": "弹窗关闭：改回点按（Click）。上游 2026-10-06 review 指出弹窗不需要长按；原先改成 300ms 长按是因为 2026-09-26 实测短按连点 12 次没关掉弹窗 —— 现改为 Click + max_hit 8 次重试，用重试次数代替按住的时长。",
+        "max_hit": 8
     },
     "Event_MercenaryBaby": {
         "recognition": "OCR",
@@ -694,7 +694,9 @@
             140,
             55
         ],
-        "timeout": 2000
+        "timeout": 2000,
+        "next": [],
+        "focus": "成功闸门：底栏中间那格显示「加尔提兰」= 已在大陆。底栏是大字体，OCR 稳定（实测 0.99+），比浮窗里的小字可靠得多"
     },
     "MapTabArchipelago": {
         "recognition": "OCR",
@@ -707,7 +709,8 @@
             140,
             55
         ],
-        "timeout": 2000
+        "timeout": 2000,
+        "next": []
     },
     "Event_PirateRaid_PickArchipelago": {
         "recognition": "OCR",
@@ -720,9 +723,12 @@
         "action": "Click",
         "post_delay": 1200,
         "timeout": 2000,
-        "focus": "浮窗里选「瑞格群岛」：纯 OCR 识别（不写 target）。注意浮窗里是区域名「瑞格群岛」，不是岛名「帕格维斯」",
+        "focus": "浮窗里选「瑞格群岛」：纯 OCR 识别（不写 target）。注意浮窗里是区域名「瑞格群岛」，不是岛名「帕格维斯」 ｜ 终点节点必须显式写 next: []（否则 maa 会回到父节点的 next 列表继续跑，把兜底节点重复执行）",
         "expected": [
             "瑞格群岛"
+        ],
+        "next": [
+            "MapTabArchipelago"
         ]
     },
     "Event_PirateRaid_RegionSwitch": {
@@ -759,9 +765,12 @@
         "action": "Click",
         "post_delay": 1200,
         "timeout": 2000,
-        "focus": "浮窗里选「加尔提兰」：纯 OCR 识别（不写 target，点在识别到的文字框上）。浮窗显示的是区域名",
+        "focus": "浮窗里选「加尔提兰」：纯 OCR 识别（不写 target，点在识别到的文字框上）。浮窗显示的是区域名 ｜ 终点节点必须显式写 next: []（否则 maa 会回到父节点的 next 列表继续跑，把兜底节点重复执行）",
         "expected": [
             "加尔提兰"
+        ],
+        "next": [
+            "MapTabContinent"
         ]
     },
     "Event_PirateRaid_RegionSwitchContinent": {
@@ -778,7 +787,7 @@
         "next": [
             "Event_PirateRaid_PickContinent"
         ],
-        "focus": "点底栏中间的区域格，弹出地区切换浮窗（post_delay 1600ms：实测浮窗弹出动画约 1 秒，原来 800ms 会在动画未完成时就去 OCR 浮窗导致扫空 → 整条跨区域链失败 → 年度任务卡死）"
+        "focus": "点底栏中间区域格开浮窗（只在 PickContinent 确认浮窗没开时才会走到这里）。post_delay 1600ms 等浮窗弹出动画"
     },
     "Event_PirateRaid_GoContinent": {
         "recognition": "DirectHit",
