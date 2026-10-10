@@ -35,22 +35,23 @@ class AutoFightProcessor(CustomAction):
     """先被动等待反击，超过指定回合后执行主动战斗。
 
     策略：前 20 轮全部依赖「结束回合 + 自动反击」，让敌人自己走过来；
-    仅当 5 轮后仍未通关时，才进入主动搜索与追击模式。这样可以减少决策
+    仅当 20 轮后仍未通关时，才进入主动搜索与追击模式。这样可以减少决策
     次数，避免每局都触发 16 视野螺旋搜索的低性价比操作。
     """
 
     # A battle can legitimately last well beyond the old per-invocation limit
     # of 40.  The session survives recovery calls; this high ceiling is only a
     # final safety fuse, while the normal stop condition is a verified result.
-    MAX_ACTION_CYCLES = 120
+    MAX_ACTION_CYCLES = 300
     # 回合数硬上限：被动阶段跑满 PASSIVE_ROUNDS 后转主动追击，
-# 主动阶段再推到该值仍未结束则判定僵局并主动撤退（上游作者 2026-10-06 建议：
-# 正常战斗可能 5 回合打不完，20 回合是合理被动值；30 回合还打不完说明卡住了）。
+# 主动阶段再推到该值仍未结束则判定僵局并主动撤退。
+# 上游作者 2026-10-09 确认的设计：被动 5 回合能解决大部分任务、20 回合能解决大地图；
+# 第 21 回合起进入主动搜索与追击；总回合 40 回合仍未结束才算僵局。
 # 早期注释：2026-09-27 实测「海盗侵袭」可打到 173 回合仍不结束
     # （敌人全部不可见、我方 4 人满血，每回合只点结束回合），此时
     # _record_round_advance 每回合都在“有进展”，MAX_NO_PROGRESS_CYCLES
     # 永远不会触发，只能靠这个硬上限兜底。
-    MAX_CONFIRMED_ROUNDS = 30
+    MAX_CONFIRMED_ROUNDS = 40
     # 战斗内「设置 → 撤退」按钮坐标（720x1280）与撤退确认框的「确定」。
     # 撤退弹窗原文：撤退人员不会受伤，不会消耗月份。
     RETREAT_SETTINGS_POINT = (49, 1237)
@@ -246,8 +247,8 @@ class AutoFightProcessor(CustomAction):
             if battle_result is not None:
                 return CustomAction.RunResult(success=battle_result)
 
-            # 所有任务统一先完整结束 5 个回合。判断依据存放在整场会话中，
-            # AutoFightProcessor 被恢复逻辑再次调用时不会重新等待 5 回合。
+            # 所有任务统一先完整结束 20 个回合。判断依据存放在整场会话中，
+            # AutoFightProcessor 被恢复逻辑再次调用时不会重新等待 20 回合。
             use_active_strategy = self._session.confirmed_rounds >= passive_rounds
             if not use_active_strategy:
                 logger.debug(
